@@ -43,7 +43,6 @@ async function handleGetJobClick() {
             },
             body: JSON.stringify({
                 url: window.location.href, // or get from active tab
-                pageContent: document.body.innerHTML // if needed
             })
         });
 
