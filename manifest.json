@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
-    "name": "[Name]",
+    "name": "ResumeSculpt",
     "version": "1.0",
-    "description": "[Name] helps you personalize your resume using AI based on the job description.",
+    "description": "ResumeSculpt helps you personalize your resume using AI based on the job description.",
     "action": {
         "default_popup": "popup/popup.html",
         "default_icon": {
