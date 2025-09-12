@@ -623,3 +623,55 @@ body::before {
 .main-content::-webkit-scrollbar-thumb:hover {
     background: rgba(138, 43, 226, 0.7);
 }
+
+/* Input section styles */
+.input-section {
+    margin-bottom: 16px;
+}
+
+.job-input-textarea {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 16px;
+    color: #e6f1ff;
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1.5;
+    resize: vertical;
+    min-height: 100px;
+    margin-bottom: 12px;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+.job-input-textarea:focus {
+    outline: none;
+    border-color: rgba(138, 43, 226, 0.4);
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: 0 0 0 2px rgba(138, 43, 226, 0.15);
+}
+
+.job-input-textarea::placeholder {
+    color: #8892b0;
+    font-style: italic;
+}
+
+.job-input-textarea::-webkit-scrollbar {
+    width: 4px;
+}
+
+.job-input-textarea::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 2px;
+}
+
+.job-input-textarea::-webkit-scrollbar-thumb {
+    background: rgba(138, 43, 226, 0.5);
+    border-radius: 2px;
+}
+
+.job-input-textarea::-webkit-scrollbar-thumb:hover {
+    background: rgba(138, 43, 226, 0.7);
+}

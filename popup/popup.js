@@ -12,65 +12,88 @@ function initializeEventListeners() {
     document.getElementById('landingBtn').addEventListener('click', handleLandingClick);
 
     // Action buttons
-    document.getElementById('getJobBtn').addEventListener('click', handleGetJobClick);
+    document.getElementById('addJobBtn').addEventListener('click', handleAddJobClick);
     document.getElementById('readMoreBtn').addEventListener('click', handleReadMoreClick);
     document.getElementById('analyzeBtn').addEventListener('click', handleAnalyzeClick);
     document.getElementById('generateBtn').addEventListener('click', handleGenerateClick);
     document.getElementById('previewBtn').addEventListener('click', handlePreviewClick);
     document.getElementById('downloadBtn').addEventListener('click', handleDownloadClick);
+    document.getElementById('recalculateBtn').addEventListener('click', handleRecalculateClick);
+
+    // Textarea input listener
+    document.getElementById('jobDescriptionInput').addEventListener('input', handleJobDescriptionInputChange);
 }
 
 // Event handlers
 function handleLandingClick() {
-    window.open('https://resumeforge.ai', '_blank');
+    window.open('https://resumesculpt.com', '_blank');
 }
 
-async function handleGetJobClick() {
-    const btn = document.getElementById('getJobBtn');
-    const originalText = btn.innerHTML;
+function handleJobDescriptionInputChange() {
+    const textarea = document.getElementById('jobDescriptionInput');
+    const addJobBtn = document.getElementById('addJobBtn');
 
-    showLoadingState(btn, 'Fetching...');
-
-    try {
-        // API CALL: GET /api/job-description
-        // This should extract job description from current page/URL
-        // Expected response: { jobDescription: string, success: boolean }
-
-        const response = await fetch('/api/job-description', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                url: window.location.href, // or get from active tab
-            })
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            jobDescriptionFull = data.jobDescription;
-            displayJobDescription();
-            updateProgress(1);
-            document.getElementById('analyzeBtn').disabled = false;
-        } else {
-            alert('Failed to extract job description');
-        }
-    } catch (error) {
-        console.error('Error fetching job description:', error);
-        alert('Error fetching job description');
-    } finally {
-        btn.innerHTML = originalText;
+    // Enable/disable the Add Job Description button based on input
+    if (textarea.value.trim().length > 0) {
+        addJobBtn.disabled = false;
+    } else {
+        addJobBtn.disabled = true;
     }
+}
+
+function handleAddJobClick() {
+    const textarea = document.getElementById('jobDescriptionInput');
+    const inputText = textarea.value.trim();
+
+    if (inputText.length === 0) {
+        alert('Please paste a job description first');
+        return;
+    }
+
+    if (inputText.length < 50) {
+        alert('Job description seems too short. Please provide a more detailed job description.');
+        return;
+    }
+
+    // Store the job description
+    jobDescriptionFull = inputText;
+
+    // Display the job description
+    displayJobDescription();
+
+    // Update progress
+    updateProgress(1);
+
+    // Enable analyze button
+    document.getElementById('analyzeBtn').disabled = false;
+
+    // Clear and hide the input section
+    textarea.value = '';
+    document.querySelector('.input-section').style.display = 'none';
+
+    // Show success message briefly
+    const addJobBtn = document.getElementById('addJobBtn');
+    const originalText = addJobBtn.innerHTML;
+    addJobBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M20 6L9 17l-5-5"/></svg>Added Successfully';
+    addJobBtn.disabled = true;
+
+    setTimeout(() => {
+        addJobBtn.innerHTML = originalText;
+    }, 2000);
 }
 
 function displayJobDescription() {
     const jobContainer = document.getElementById('jobContainer');
     const jobDescription = document.getElementById('jobDescription');
 
-    // Show truncated version
-    jobDescription.textContent = jobDescriptionFull.substring(0, 200) + "...";
-    jobContainer.style.display = 'block';
+    if (jobDescriptionFull && jobDescriptionFull.length > 0) {
+        // Show truncated version
+        jobDescription.textContent = jobDescriptionFull.substring(0, 200) + "...";
+        jobContainer.style.display = 'block';
+
+        // Scroll into view
+        jobContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
 }
 
 function handleReadMoreClick() {
@@ -100,10 +123,19 @@ async function handleAnalyzeClick() {
     showLoadingState(btn, 'Analyzing...');
 
     try {
-        // API CALL: POST /api/analyze-job
-        // This should analyze the job description and return optimization score
-        // Expected response: { score: number, insights: array, success: boolean }
+        // For MVP: Simulate API call with mock data
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate delay
 
+        // Mock analysis - in real implementation, this would be an API call
+        const mockScore = Math.floor(Math.random() * 40) + 40; // Random score between 40-80
+
+        // Update the original score
+        document.getElementById('originalScore').textContent = `${mockScore}%`;
+        updateProgress(2);
+        document.getElementById('generateBtn').disabled = false;
+
+        // Future API call would look like this:
+        /*
         const response = await fetch('/api/analyze-job', {
             method: 'POST',
             headers: {
@@ -117,12 +149,13 @@ async function handleAnalyzeClick() {
         const data = await response.json();
 
         if (data.success) {
-            document.getElementById('optimizationScore').textContent = `${data.score}%`;
+            document.getElementById('originalScore').textContent = `${data.score}%`;
             updateProgress(2);
             document.getElementById('generateBtn').disabled = false;
         } else {
             alert('Failed to analyze job description');
         }
+        */
     } catch (error) {
         console.error('Error analyzing job:', error);
         alert('Error analyzing job description');
@@ -138,11 +171,33 @@ async function handleGenerateClick() {
     showLoadingState(btn, 'Generating...');
 
     try {
-        // API CALL: POST /api/generate-resume
-        // This should generate optimized resume based on job description
-        // You might need to include user's current resume data
-        // Expected response: { resumeContent: string, resumeId: string, success: boolean }
+        // For MVP: Simulate API call with mock data
+        await new Promise(resolve => setTimeout(resolve, 3000)); // Simulate delay
 
+        // Mock resume generation - in real implementation, this would be an API call
+        const originalScoreText = document.getElementById('originalScore').textContent;
+        const originalScore = parseInt(originalScoreText.replace('%', ''));
+        const optimizedScore = Math.min(originalScore + Math.floor(Math.random() * 30) + 15, 95); // Improve by 15-45 points
+
+        const mockResumeData = {
+            resumeId: 'mock-' + Date.now(),
+            success: true,
+            originalScore: originalScore,
+            optimizedScore: optimizedScore,
+            resumeContent: 'Mock resume content...'
+        };
+
+        // Store resume data for preview/download
+        window.generatedResume = mockResumeData;
+        updateProgress(3);
+        document.getElementById('previewBtn').disabled = false;
+        document.getElementById('downloadBtn').disabled = false;
+
+        // Show and update the optimized score section
+        showOptimizedScoreSection(mockResumeData);
+
+        // Future API call would look like this:
+        /*
         const response = await fetch('/api/generate-resume', {
             method: 'POST',
             headers: {
@@ -150,22 +205,23 @@ async function handleGenerateClick() {
             },
             body: JSON.stringify({
                 jobDescription: jobDescriptionFull,
-                // userResumeData: getUserResumeData(), // implement this function
-                // preferences: getUserPreferences() // implement this function
+                // userResumeData: getUserResumeData(),
+                // preferences: getUserPreferences()
             })
         });
 
         const data = await response.json();
 
         if (data.success) {
-            // Store resume data for preview/download
             window.generatedResume = data;
             updateProgress(3);
             document.getElementById('previewBtn').disabled = false;
             document.getElementById('downloadBtn').disabled = false;
+            showOptimizedScoreSection(data);
         } else {
             alert('Failed to generate resume');
         }
+        */
     } catch (error) {
         console.error('Error generating resume:', error);
         alert('Error generating resume');
@@ -174,12 +230,100 @@ async function handleGenerateClick() {
     }
 }
 
-async function handlePreviewClick() {
-    try {
-        // API CALL: GET /api/preview-resume/:resumeId
-        // This should return preview URL or HTML content
-        // Expected response: { previewUrl: string, success: boolean }
+function showOptimizedScoreSection(resumeData) {
+    // Get the current original score from the first section
+    const originalScoreText = document.getElementById('originalScore').textContent;
+    const originalScore = originalScoreText !== '--' ? parseInt(originalScoreText.replace('%', '')) : (resumeData.originalScore ?? 60);
 
+    // Use optimized score from API response or fallback
+    const optimizedScore = resumeData.optimizedScore ?? 90;
+
+    // Show the optimized score section
+    const optimizedScoreSection = document.getElementById('optimizedScoreSection');
+    optimizedScoreSection.style.display = 'block';
+
+    // Add slide-in animation
+    optimizedScoreSection.style.animation = 'slideIn 0.5s ease-out';
+
+    // Update the score displays
+    document.getElementById('originalScoreDisplay').textContent = `${originalScore}%`;
+    document.getElementById('optimizedScore').textContent = `${optimizedScore}%`;
+
+    // Calculate and display improvement
+    const improvement = optimizedScore - originalScore;
+    const improvementTextEl = document.getElementById('improvementText');
+    const improvementIndicator = document.getElementById('improvementIndicator');
+
+    if (improvement > 0) {
+        improvementTextEl.textContent = `Improved by ${improvement}%! 🎉`;
+        improvementTextEl.className = 'improvement-text positive';
+        improvementIndicator.style.background = 'rgba(0, 212, 170, 0.1)';
+    } else if (improvement === 0) {
+        improvementTextEl.textContent = 'Score maintained';
+        improvementTextEl.className = 'improvement-text neutral';
+        improvementIndicator.style.background = 'rgba(136, 146, 176, 0.1)';
+    } else {
+        improvementTextEl.textContent = `Score decreased by ${Math.abs(improvement)}%`;
+        improvementTextEl.className = 'improvement-text negative';
+        improvementIndicator.style.background = 'rgba(255, 107, 107, 0.1)';
+    }
+
+    // Update progress to show optimization completed
+    updateProgress(3);
+
+    // Scroll to show the new section
+    setTimeout(() => {
+        optimizedScoreSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 100);
+}
+
+async function handleRecalculateClick() {
+    const btn = document.getElementById('recalculateBtn');
+    const originalText = btn.innerHTML;
+    showLoadingState(btn, 'Recalculating...');
+
+    try {
+        // For MVP: Simulate recalculation
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        const originalScoreText = document.getElementById('originalScore').textContent;
+        const originalScore = parseInt(originalScoreText.replace('%', ''));
+        const newOptimizedScore = Math.min(originalScore + Math.floor(Math.random() * 35) + 10, 98);
+
+        const updatedData = {
+            success: true,
+            originalScore: originalScore,
+            optimizedScore: newOptimizedScore
+        };
+
+        showOptimizedScoreSection(updatedData);
+
+        // Future API call would look like this:
+        /*
+        const response = await fetch(`/api/recalculate-score/${window.generatedResume.resumeId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            showOptimizedScoreSection(data);
+        } else {
+            alert('Failed to recalculate score');
+        }
+        */
+    } catch (error) {
+        console.error('Error recalculating score:', error);
+        alert('Error recalculating score');
+    } finally {
+        btn.innerHTML = originalText;
+    }
+}
+
+async function handlePreviewClick() {
+    // For MVP: Show a simple alert
+    alert('Preview feature will be available soon! This will show you a preview of your optimized resume.');
+
+    // Future implementation:
+    /*
+    try {
         const response = await fetch(`/api/preview-resume/${window.generatedResume.resumeId}`);
         const data = await response.json();
 
@@ -192,14 +336,44 @@ async function handlePreviewClick() {
         console.error('Error previewing resume:', error);
         alert('Error generating preview');
     }
+    */
 }
 
 async function handleDownloadClick() {
-    try {
-        // API CALL: GET /api/download-resume/:resumeId
-        // This should return the resume file (PDF/DOCX)
-        // Expected response: Binary file data
+    // For MVP: Simulate download
+    const btn = document.getElementById('downloadBtn');
+    const originalText = btn.innerHTML;
 
+    showLoadingState(btn, 'Preparing...');
+
+    try {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Create a mock PDF download
+        const mockPdfContent = `ResumeSculpt Optimized Resume
+Generated on: ${new Date().toLocaleDateString()}
+Job Match Score: ${document.getElementById('optimizedScore').textContent}
+
+This is a mock resume file for MVP testing.
+Your actual optimized resume will be generated here.
+
+Based on the job description you provided:
+${jobDescriptionFull.substring(0, 200)}...
+
+Thank you for using ResumeSculpt!`;
+
+        const blob = new Blob([mockPdfContent], { type: 'text/plain' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'resumesculpt_optimized_resume.txt';
+        link.click();
+        window.URL.revokeObjectURL(url);
+
+        updateProgress(5);
+
+        // Future implementation:
+        /*
         const response = await fetch(`/api/download-resume/${window.generatedResume.resumeId}`);
 
         if (response.ok) {
@@ -210,14 +384,16 @@ async function handleDownloadClick() {
             link.download = 'optimized_resume.pdf';
             link.click();
             window.URL.revokeObjectURL(url);
-
-            updateProgress(4);
+            updateProgress(5);
         } else {
             alert('Failed to download resume');
         }
+        */
     } catch (error) {
         console.error('Error downloading resume:', error);
         alert('Error downloading resume');
+    } finally {
+        btn.innerHTML = originalText;
     }
 }
 
@@ -225,12 +401,14 @@ async function handleDownloadClick() {
 function updateProgress(step) {
     for (let i = 1; i <= step; i++) {
         const stepIcon = document.getElementById(`step${i}`);
-        const stepItem = stepIcon.parentElement;
+        if (stepIcon) {
+            const stepItem = stepIcon.parentElement;
 
-        stepIcon.classList.remove('pending');
-        stepIcon.classList.add('completed');
-        stepIcon.innerHTML = '✓';
-        stepItem.classList.add('completed');
+            stepIcon.classList.remove('pending');
+            stepIcon.classList.add('completed');
+            stepIcon.innerHTML = '✓';
+            stepItem.classList.add('completed');
+        }
     }
 }
 
@@ -239,7 +417,7 @@ function showLoadingState(button, loadingText) {
     button.innerHTML = `${loadingIcon}${loadingText}`;
 }
 
-// TODO: Implement these helper functions based on your data structure
+// Helper functions for future implementation
 // function getUserResumeData() {
 //     // Get user's current resume data from storage/form
 //     return {};
