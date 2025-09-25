@@ -1,23 +1,22 @@
 {
     "manifest_version": 3,
-    "name": "ResumeSculpt",
-    "version": "1.0",
-    "description": "ResumeSculpt helps you personalize your resume using AI based on the job description.",
+    "name": "ResumeSculpt - AI Resume Optimizer",
+    "version": "1.0.0",
+    "description": "Optimize your resume for any job with AI-powered matching and tailoring",
+    "permissions": [
+        "storage",
+        "activeTab",
+        "scripting"
+    ],
+    "host_permissions": [
+        "http://localhost:5000/*",
+        "https://your-domain.com/*"
+    ],
     "action": {
         "default_popup": "popup/popup.html",
-        "default_icon": {
-            "16": "icons/icon16.png",
-            "48": "icons/icon48.png",
-            "128": "icons/icon128.png"
-        }
+        "default_title": "ResumeSculpt"
     },
-    "permissions": [
-        "activeTab",
-        "https://api_for_product.com/"
-    ],
-    "icons": {
-        "16": "icons/icon16.png",
-        "48": "icons/icon48.png",
-        "128": "icons/icon128.png"
+    "content_security_policy": {
+        "extension_pages": "script-src 'self'; object-src 'self'"
     }
 }
