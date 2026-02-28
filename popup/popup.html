@@ -9,148 +9,224 @@
 </head>
 
 <body>
-    <div class="header">
-        <div class="logo">
-            <div class="logo-icon">
-                <img src="./assets/ResumeSculpt-removebg-preview_waifu2x_photo_noise1_scale.svg" height="40"
+    <!-- Authentication Screen -->
+    <div id="authScreen" style="display: none;">
+        <div class="auth-container">
+            <div class="logo-center">
+                <img src="./assets/ResumeSculpt-removebg-preview_waifu2x_photo_noise1_scale.svg" height="60"
                     alt="Logo" />
+                <h2>ResumeSculpt</h2>
             </div>
-            <div class="logo-text">ResumeSculpt</div>
-        </div>
-        <div class="header-actions">
-            <button class="landing-btn" id="landingBtn">Visit Site</button>
-            <button class="settings-btn">
-                <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 1l3.5 7 7.5 1-5.5 5 1.5 7.5L12 18l-6.5 3.5L7 14l-5.5-5L9 8l3-7z" />
-                </svg>
-            </button>
+
+            <!-- Login Form -->
+            <div id="loginForm" class="auth-form">
+                <h3>Login</h3>
+                <input type="email" id="loginEmail" placeholder="Email" class="auth-input" />
+                <input type="password" id="loginPassword" placeholder="Password" class="auth-input" />
+                <div id="loginError" class="error-message"></div>
+                <button id="loginBtn" class="btn btn-primary">Login</button>
+                <p class="auth-toggle">Don't have an account? <a href="#" id="showSignup">Sign up</a></p>
+            </div>
+
+            <!-- Signup Form -->
+            <div id="signupForm" class="auth-form" style="display: none;">
+                <h3>Sign Up</h3>
+                <input type="text" id="signupName" placeholder="Full Name (optional)" class="auth-input" />
+                <input type="email" id="signupEmail" placeholder="Email" class="auth-input" />
+                <input type="password" id="signupPassword" placeholder="Password (min 6 chars)" class="auth-input" />
+                <div id="signupError" class="error-message"></div>
+                <button id="signupBtn" class="btn btn-primary">Sign Up</button>
+                <p class="auth-toggle">Already have an account? <a href="#" id="showLogin">Login</a></p>
+            </div>
         </div>
     </div>
 
-    <div class="main-content">
-        <!-- Original Match Score Section -->
-        <div class="status-section">
-            <div class="status-header">
-                <div class="status-title">Original Match Score</div>
+    <!-- Main Application (shown after login) -->
+    <div id="mainApp" style="display: none;">
+        <div class="header">
+            <div class="logo">
+                <div class="logo-icon">
+                    <img src="./assets/ResumeSculpt-removebg-preview_waifu2x_photo_noise1_scale.svg" height="40"
+                        alt="Logo" />
+                </div>
+                <div class="logo-text">ResumeSculpt</div>
             </div>
-            <div class="status-value" id="originalScore">--</div>
-        </div>
-
-        <div class="action-section">
-            <div class="section-title">Job Analysis</div>
-
-            <!-- Job Description Input Area -->
-            <div class="input-section">
-                <textarea id="jobDescriptionInput" class="job-input-textarea"
-                    placeholder="Paste the job description here..." rows="4"></textarea>
-                <button class="btn btn-primary" id="addJobBtn">
+            <div class="header-actions">
+                <span id="userEmail" class="user-email"></span>
+                <button class="landing-btn" id="landingBtn">Visit Site</button>
+                <button class="settings-btn" id="logoutBtn" title="Logout">
                     <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
                         <path
-                            d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                            d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" />
                     </svg>
-                    Add Job Description
+                </button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <!-- Resume Upload Section -->
+            <div class="action-section" id="resumeSection">
+                <div class="section-title">Your Resume</div>
+
+                <!-- No resume uploaded yet -->
+                <div id="noResumeState">
+                    <label for="resumeFileInput" class="btn btn-primary" id="uploadResumeLabel"
+                        style="cursor:pointer; margin-bottom: 0;">
+                        <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="17 8 12 3 7 8" />
+                            <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
+                        Upload Resume (PDF)
+                    </label>
+                    <div id="uploadError" class="error-message"></div>
+                </div>
+
+                <!-- Resume already uploaded -->
+                <div id="hasResumeState" style="display:none;">
+                    <div class="resume-uploaded-card">
+                        <div class="resume-file-info">
+                            <svg class="icon" viewBox="0 0 24 24" fill="currentColor"
+                                style="color:#8A2BE2;flex-shrink:0;">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                <polyline points="14 2 14 8 20 8" />
+                            </svg>
+                            <span class="resume-filename-text" id="resumeFilenameText">resume.pdf</span>
+                        </div>
+                        <label for="resumeFileInput" class="change-resume-btn">Change</label>
+                    </div>
+                    <div id="uploadError2" class="error-message"></div>
+                </div>
+
+                <!-- Hidden file input -->
+                <input type="file" id="resumeFileInput" accept=".pdf" style="display:none;" />
+            </div>
+
+            <!-- Original Match Score Section -->
+
+            <div class="status-section">
+                <div class="status-header">
+                    <div class="status-title">Original Match Score</div>
+                </div>
+                <div class="status-value" id="originalScore">--</div>
+            </div>
+
+            <div class="action-section">
+                <div class="section-title">Job Analysis</div>
+
+                <!-- Job Description Input Area -->
+                <div class="input-section">
+                    <textarea id="jobDescriptionInput" class="job-input-textarea"
+                        placeholder="Paste the job description here..." rows="4"></textarea>
+                    <button class="btn btn-primary" id="addJobBtn">
+                        <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                            <path
+                                d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                        </svg>
+                        Add Job Description
+                    </button>
+                </div>
+
+                <div class="job-description-container" id="jobContainer" style="display: none;">
+                    <div class="job-description" id="jobDescription">
+                        <!-- Job description will be populated here -->
+                    </div>
+                    <div class="job-description-fade" id="fadeOverlay"></div>
+                    <button class="read-more-btn" id="readMoreBtn">Show Full Description</button>
+                </div>
+
+                <button class="btn btn-secondary" id="analyzeBtn" disabled>
+                    <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                    </svg>
+                    Analyze Compatibility
                 </button>
             </div>
 
-            <div class="job-description-container" id="jobContainer" style="display: none;">
-                <div class="job-description" id="jobDescription">
-                    <!-- Job description will be populated here -->
-                </div>
-                <div class="job-description-fade" id="fadeOverlay"></div>
-                <button class="read-more-btn" id="readMoreBtn">Show Full Description</button>
-            </div>
-
-            <button class="btn btn-secondary" id="analyzeBtn" disabled>
-                <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-                </svg>
-                Analyze Compatibility
-            </button>
-        </div>
-
-        <div class="action-section">
-            <div class="section-title">AI Optimization</div>
-            <button class="btn btn-primary" id="generateBtn" disabled>
-                <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                </svg>
-                Generate Optimized Resume
-            </button>
-
-            <button class="btn btn-secondary" id="previewBtn" disabled>
-                <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
-                    <circle cx="11" cy="11" r="8" />
-                    <path d="m21 21-4.35-4.35" />
-                </svg>
-                Preview Changes
-            </button>
-
-            <button class="btn btn-success" id="downloadBtn" disabled>
-                <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="7 10 12 15 17 10" />
-                    <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-                Download Resume
-            </button>
-        </div>
-
-        <!-- New Optimized Resume Score Section -->
-        <div class="optimized-score-section" id="optimizedScoreSection" style="display: none;">
-            <div class="section-title">Optimization Results</div>
-            <div class="score-comparison">
-                <div class="score-card original-score-card">
-                    <div class="score-label">Original Score</div>
-                    <div class="score-value" id="originalScoreDisplay">--</div>
-                </div>
-                <div class="score-arrow">
+            <div class="action-section">
+                <div class="section-title">AI Optimization</div>
+                <button class="btn btn-primary" id="generateBtn" disabled>
                     <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M5 12h14m-7-7l7 7-7 7" />
+                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
                     </svg>
-                </div>
-                <div class="score-card optimized-score-card">
-                    <div class="score-label">Optimized Score</div>
-                    <div class="score-value" id="optimizedScore">--</div>
-                </div>
-            </div>
-            <div class="improvement-indicator" id="improvementIndicator">
-                <div class="improvement-text" id="improvementText">Calculating improvement...</div>
-            </div>
-            <button class="btn btn-secondary" id="recalculateBtn">
-                <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                    <path d="M3 3v5h5" />
-                    <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
-                    <path d="M21 21v-5h-5" />
-                </svg>
-                Recalculate Score
-            </button>
-        </div>
+                    Generate Optimized Resume
+                </button>
 
-        <div class="progress-section">
-            <div class="section-title">Progress</div>
-            <div class="progress-item">
-                <div class="progress-icon pending" id="step1">1</div>
-                <span>Add job description</span>
+                <button class="btn btn-secondary" id="previewBtn" disabled>
+                    <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="m21 21-4.35-4.35" />
+                    </svg>
+                    Preview Changes
+                </button>
+
+                <button class="btn btn-success" id="downloadBtn" disabled>
+                    <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    Download Resume
+                </button>
             </div>
-            <div class="progress-item">
-                <div class="progress-icon pending" id="step2">2</div>
-                <span>Analyze resume compatibility</span>
+
+            <!-- New Optimized Resume Score Section -->
+            <div class="optimized-score-section" id="optimizedScoreSection" style="display: none;">
+                <div class="section-title">Optimization Results</div>
+                <div class="score-comparison">
+                    <div class="score-card original-score-card">
+                        <div class="score-label">Original Score</div>
+                        <div class="score-value" id="originalScoreDisplay">--</div>
+                    </div>
+                    <div class="score-arrow">
+                        <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M5 12h14m-7-7l7 7-7 7" />
+                        </svg>
+                    </div>
+                    <div class="score-card optimized-score-card">
+                        <div class="score-label">Optimized Score</div>
+                        <div class="score-value" id="optimizedScore">--</div>
+                    </div>
+                </div>
+                <div class="improvement-indicator" id="improvementIndicator">
+                    <div class="improvement-text" id="improvementText">Calculating improvement...</div>
+                </div>
+                <button class="btn btn-secondary" id="recalculateBtn">
+                    <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                        <path d="M3 3v5h5" />
+                        <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                        <path d="M21 21v-5h-5" />
+                    </svg>
+                    Recalculate Score
+                </button>
             </div>
-            <div class="progress-item">
-                <div class="progress-icon pending" id="step3">3</div>
-                <span>Generate AI-optimized version</span>
-            </div>
-            <div class="progress-item">
-                <div class="progress-icon pending" id="step4">4</div>
-                <span>Calculate optimization score</span>
-            </div>
-            <div class="progress-item">
-                <div class="progress-icon pending" id="step5">5</div>
-                <span>Download final resume</span>
+
+            <div class="progress-section">
+                <div class="section-title">Progress</div>
+                <div class="progress-item">
+                    <div class="progress-icon pending" id="step1">1</div>
+                    <span>Add job description</span>
+                </div>
+                <div class="progress-item">
+                    <div class="progress-icon pending" id="step2">2</div>
+                    <span>Analyze resume compatibility</span>
+                </div>
+                <div class="progress-item">
+                    <div class="progress-icon pending" id="step3">3</div>
+                    <span>Generate AI-optimized version</span>
+                </div>
+                <div class="progress-item">
+                    <div class="progress-icon pending" id="step4">4</div>
+                    <span>Calculate optimization score</span>
+                </div>
+                <div class="progress-item">
+                    <div class="progress-icon pending" id="step5">5</div>
+                    <span>Download final resume</span>
+                </div>
             </div>
         </div>
-    </div>
+    </div> <!-- End of mainApp -->
 
     <script src="popup.js"></script>
 </body>

@@ -86,8 +86,7 @@
 /* Body and layout */
 body {
     width: 380px;
-    height: 700px;
-    /* Increased height for new section */
+    /* No fixed height — popup sizes to content dynamically */
     background: #181828;
     color: white;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -95,7 +94,17 @@ body {
     position: relative;
 }
 
-body::before {
+/* Main App — fixed height with internal scroll */
+#mainApp {
+    width: 380px;
+    height: 560px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#mainApp::before {
     content: '';
     position: absolute;
     top: 0;
@@ -112,73 +121,63 @@ body::before {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 20px 24px;
+    padding: 12px 18px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     backdrop-filter: blur(10px);
     position: relative;
     z-index: 1;
+    flex-shrink: 0;
 }
 
 .logo {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
 }
 
 .logo-icon {
-    width: 40px;
-    height: 40px;
+    width: 32px;
+    height: 32px;
     background: linear-gradient(135deg, #8A2BE2, #FF1493, #00CED1);
     background-size: 200% 200%;
-    border-radius: 12px;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
     position: relative;
     animation: shimmer 3s ease-in-out infinite;
-    box-shadow: 0 4px 20px rgba(138, 43, 226, 0.3);
+    box-shadow: 0 3px 14px rgba(138, 43, 226, 0.3);
+    flex-shrink: 0;
 }
 
 .logo-icon svg {
-    width: 22px;
-    height: 22px;
+    width: 18px;
+    height: 18px;
     color: white;
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
 }
 
 .logo-text {
-    font-size: 18px;
+    font-size: 15px;
     font-weight: 700;
     background: linear-gradient(135deg, #8A2BE2, #FF1493);
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     letter-spacing: -0.5px;
+    white-space: nowrap;
 }
 
 .header-actions {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     align-items: center;
+    flex-shrink: 0;
 }
 
+/* Visit Site button — hidden in header to save space */
 .landing-btn {
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    color: #e6f1ff;
-    padding: 8px 14px;
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    backdrop-filter: blur(10px);
-}
-
-.landing-btn:hover {
-    background: rgba(138, 43, 226, 0.2);
-    border-color: rgba(138, 43, 226, 0.4);
-    transform: translateY(-1px);
+    display: none;
 }
 
 .settings-btn {
@@ -196,21 +195,71 @@ body::before {
     background: rgba(138, 43, 226, 0.1);
 }
 
-/* Main content */
+/* Main content — fills remaining height inside #mainApp and scrolls */
 .main-content {
-    padding: 24px;
-    height: calc(100% - 100px);
+    padding: 16px 18px;
+    flex: 1;
     overflow-y: auto;
     position: relative;
     z-index: 1;
 }
 
+/* Resume uploaded card */
+.resume-uploaded-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(138, 43, 226, 0.07);
+    border: 1px solid rgba(138, 43, 226, 0.2);
+    border-radius: 10px;
+    padding: 10px 14px;
+    gap: 10px;
+}
+
+.resume-file-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.resume-filename-text {
+    font-size: 12px;
+    font-weight: 500;
+    color: #cbd5e0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 180px;
+}
+
+.change-resume-btn {
+    font-size: 11px;
+    font-weight: 600;
+    color: #8A2BE2;
+    background: rgba(138, 43, 226, 0.12);
+    border: 1px solid rgba(138, 43, 226, 0.25);
+    border-radius: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.change-resume-btn:hover {
+    background: rgba(138, 43, 226, 0.22);
+    color: #FF1493;
+    border-color: rgba(255, 20, 147, 0.3);
+}
+
 /* Status section */
+
 .status-section {
     background: linear-gradient(135deg, rgba(138, 43, 226, 0.08), rgba(255, 20, 147, 0.04));
-    border-radius: 16px;
-    padding: 20px;
-    margin-bottom: 24px;
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
     border: 1px solid rgba(138, 43, 226, 0.15);
     position: relative;
     overflow: hidden;
@@ -244,7 +293,7 @@ body::before {
 }
 
 .status-value {
-    font-size: 28px;
+    font-size: 24px;
     font-weight: 800;
     background: linear-gradient(135deg, #8A2BE2, #FF1493);
     background-clip: text;
@@ -381,16 +430,18 @@ body::before {
 
 /* Action sections */
 .action-section {
-    margin-bottom: 28px;
+    margin-bottom: 18px;
 }
 
 .section-title {
-    font-size: 16px;
+    font-size: 13px;
     font-weight: 700;
-    margin-bottom: 16px;
+    margin-bottom: 10px;
     color: #f7fafc;
     position: relative;
-    padding-left: 12px;
+    padding-left: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .section-title::before {
@@ -399,8 +450,8 @@ body::before {
     left: 0;
     top: 50%;
     transform: translateY(-50%);
-    width: 4px;
-    height: 16px;
+    width: 3px;
+    height: 13px;
     background: linear-gradient(135deg, #8A2BE2, #FF1493);
     border-radius: 2px;
 }
@@ -408,18 +459,18 @@ body::before {
 /* Buttons */
 .btn {
     width: 100%;
-    padding: 14px 20px;
+    padding: 11px 18px;
     border: none;
-    border-radius: 12px;
-    font-size: 14px;
+    border-radius: 10px;
+    font-size: 13px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    margin-bottom: 12px;
+    margin-bottom: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 10px;
+    gap: 8px;
     position: relative;
     overflow: hidden;
 }
@@ -547,32 +598,32 @@ body::before {
 
 /* Progress section */
 .progress-section {
-    margin-top: 24px;
-    padding-top: 24px;
+    margin-top: 16px;
+    padding-top: 14px;
     border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .progress-item {
     display: flex;
     align-items: center;
-    gap: 16px;
-    margin-bottom: 16px;
-    font-size: 13px;
+    gap: 12px;
+    margin-bottom: 10px;
+    font-size: 12px;
     font-weight: 500;
     transition: all 0.3s ease;
 }
 
 .progress-icon {
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 12px;
+    font-size: 10px;
     font-weight: 700;
     transition: all 0.3s ease;
-    position: relative;
+    flex-shrink: 0;
 }
 
 .progress-icon.completed {
@@ -674,4 +725,187 @@ body::before {
 
 .job-input-textarea::-webkit-scrollbar-thumb:hover {
     background: rgba(138, 43, 226, 0.7);
+}
+
+/* ==================== Authentication Styles ==================== */
+#authScreen {
+    width: 380px;
+    /* No min-height — popup shrinks to content naturally */
+    background: #181828;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 36px 24px;
+    position: relative;
+    overflow: hidden;
+}
+
+#authScreen::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 350px;
+    background: radial-gradient(ellipse at center top, rgba(138, 43, 226, 0.18), transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+#authScreen::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 200px;
+    background: radial-gradient(ellipse at center bottom, rgba(255, 20, 147, 0.08), transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.auth-container {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(138, 43, 226, 0.18);
+    border-radius: 20px;
+    padding: 32px 28px;
+    width: 100%;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+    backdrop-filter: blur(16px);
+    position: relative;
+    z-index: 1;
+    animation: slideIn 0.4s ease-out;
+}
+
+.auth-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.03), transparent);
+    animation: shimmer 4s ease-in-out infinite;
+    border-radius: 20px;
+}
+
+.logo-center {
+    text-align: center;
+    margin-bottom: 28px;
+}
+
+.logo-center img {
+    filter: drop-shadow(0 0 12px rgba(138, 43, 226, 0.5));
+    animation: float 4s ease-in-out infinite;
+}
+
+.logo-center h2 {
+    background: linear-gradient(135deg, #8A2BE2, #FF1493);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-top: 12px;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+}
+
+.auth-form h3 {
+    color: #f7fafc;
+    margin-bottom: 20px;
+    font-size: 18px;
+    font-weight: 700;
+    text-align: center;
+    position: relative;
+    padding-bottom: 16px;
+}
+
+.auth-form h3::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 3px;
+    background: linear-gradient(135deg, #8A2BE2, #FF1493);
+    border-radius: 2px;
+}
+
+.auth-input {
+    width: 100%;
+    padding: 13px 16px;
+    margin-bottom: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    font-size: 14px;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: rgba(255, 255, 255, 0.04);
+    color: #e6f1ff;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+.auth-input::placeholder {
+    color: #8892b0;
+    font-style: italic;
+}
+
+.auth-input:focus {
+    outline: none;
+    border-color: rgba(138, 43, 226, 0.5);
+    background: rgba(255, 255, 255, 0.07);
+    box-shadow: 0 0 0 3px rgba(138, 43, 226, 0.15), 0 0 16px rgba(138, 43, 226, 0.1);
+}
+
+.error-message {
+    color: #FF6B6B;
+    font-size: 12px;
+    /* Use margin instead of min-height to avoid blank gap when empty */
+    margin-bottom: 12px;
+    padding-left: 4px;
+    font-weight: 500;
+    min-height: 0;
+    display: block;
+    /* Hide visually but keep layout stable only when non-empty */
+    line-height: 1.4;
+}
+
+.auth-toggle {
+    text-align: center;
+    margin-top: 18px;
+    font-size: 13px;
+    color: #8892b0;
+}
+
+.auth-toggle a {
+    background: linear-gradient(135deg, #8A2BE2, #FF1493);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-decoration: none;
+    font-weight: 700;
+    transition: opacity 0.2s ease;
+}
+
+.auth-toggle a:hover {
+    opacity: 0.8;
+    text-decoration: underline;
+    text-decoration-color: #8A2BE2;
+}
+
+.user-email {
+    font-size: 12px;
+    color: #b794f6;
+    margin-right: 4px;
+    font-weight: 500;
+    background: rgba(138, 43, 226, 0.1);
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid rgba(138, 43, 226, 0.2);
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
 }

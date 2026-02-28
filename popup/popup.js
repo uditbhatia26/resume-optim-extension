@@ -3,10 +3,10 @@
 // ============================
 let jobDescriptionFull = "";
 let isExpanded = false;
-let lastVersionId = null;
+let currentUser = null;
 
 // API base URL
-const API_BASE = "http://127.0.0.1:5000"; // change to prod later
+const API_BASE = "http://localhost:8000"; // FastAPI backend
 
 // ============================
 // Storage Helpers
@@ -21,13 +21,30 @@ function setToStorage(obj) {
 // ============================
 // API Helpers
 // ============================
-async function postJSON(url, body) {
+async function postJSON(url, body, requiresAuth = true) {
+    const headers = { "Content-Type": "application/json" };
+
+    if (requiresAuth) {
+        const { access_token } = await getFromStorage(['access_token']);
+        if (!access_token) {
+            throw new Error("Not authenticated");
+        }
+        headers["Authorization"] = `Bearer ${access_token}`;
+    }
+
     const res = await fetch(`${API_BASE}${url}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(body),
     });
     const data = await res.json();
+
+    // Handle 401 - token expired or invalid
+    if (res.status === 401) {
+        await handleLogout();
+        throw new Error("Session expired. Please login again.");
+    }
+
     if (!res.ok) throw data;
     return data;
 }
@@ -35,25 +52,250 @@ async function postJSON(url, body) {
 // ============================
 // Initialize
 // ============================
-document.addEventListener("DOMContentLoaded", function () {
+document.addEventListener("DOMContentLoaded", async function () {
+    await checkAuthStatus();
     initializeEventListeners();
 });
 
+async function checkAuthStatus() {
+    const { access_token, user_email, has_resume, resume_filename } = await getFromStorage(
+        ['access_token', 'user_email', 'has_resume', 'resume_filename']
+    );
+
+    if (access_token) {
+        currentUser = { email: user_email, has_resume: !!has_resume, resume_filename };
+        showMainApp();
+    } else {
+        showAuthScreen();
+    }
+}
+
+function showAuthScreen() {
+    document.getElementById('authScreen').style.display = 'block';
+    document.getElementById('mainApp').style.display = 'none';
+}
+
+function showMainApp() {
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'block';
+
+    // Show user email
+    const userEmailEl = document.getElementById('userEmail');
+    if (userEmailEl && currentUser) {
+        userEmailEl.textContent = currentUser.email;
+    }
+
+    // Show correct resume state
+    updateResumeUI(currentUser?.has_resume, currentUser?.resume_filename);
+}
+
 function initializeEventListeners() {
+    // Auth listeners
+    const loginBtn = document.getElementById('loginBtn');
+    const signupBtn = document.getElementById('signupBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const showSignupLink = document.getElementById('showSignup');
+    const showLoginLink = document.getElementById('showLogin');
+
+    if (loginBtn) loginBtn.addEventListener('click', handleLogin);
+    if (signupBtn) signupBtn.addEventListener('click', handleSignup);
+    if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
+    if (showSignupLink) showSignupLink.addEventListener('click', () => toggleAuthForm('signup'));
+    if (showLoginLink) showLoginLink.addEventListener('click', () => toggleAuthForm('login'));
+
     // Header
-    document.getElementById('landingBtn').addEventListener('click', handleLandingClick);
+    document.getElementById('landingBtn')?.addEventListener('click', handleLandingClick);
+
+    // Resume upload
+    document.getElementById('resumeFileInput')?.addEventListener('change', handleResumeUpload);
 
     // Actions
-    document.getElementById('addJobBtn').addEventListener('click', handleAddJobClick);
-    document.getElementById('readMoreBtn').addEventListener('click', handleReadMoreClick);
-    document.getElementById('analyzeBtn').addEventListener('click', handleAnalyzeClick);
-    document.getElementById('generateBtn').addEventListener('click', handleGenerateClick);
-    document.getElementById('previewBtn').addEventListener('click', handlePreviewClick);
-    document.getElementById('downloadBtn').addEventListener('click', handleDownloadClick);
-    document.getElementById('recalculateBtn').addEventListener('click', handleRecalculateClick);
+    document.getElementById('addJobBtn')?.addEventListener('click', handleAddJobClick);
+    document.getElementById('readMoreBtn')?.addEventListener('click', handleReadMoreClick);
+    document.getElementById('analyzeBtn')?.addEventListener('click', handleAnalyzeClick);
+    document.getElementById('generateBtn')?.addEventListener('click', handleGenerateClick);
+    document.getElementById('previewBtn')?.addEventListener('click', handlePreviewClick);
+    document.getElementById('downloadBtn')?.addEventListener('click', handleDownloadClick);
+    document.getElementById('recalculateBtn')?.addEventListener('click', handleRecalculateClick);
 
     // Textarea input
-    document.getElementById('jobDescriptionInput').addEventListener('input', handleJobDescriptionInputChange);
+    const jobDescInput = document.getElementById('jobDescriptionInput');
+    if (jobDescInput) jobDescInput.addEventListener('input', handleJobDescriptionInputChange);
+}
+
+// ============================
+// Authentication Handlers
+// ============================
+function toggleAuthForm(form) {
+    const loginForm = document.getElementById('loginForm');
+    const signupForm = document.getElementById('signupForm');
+
+    if (form === 'signup') {
+        loginForm.style.display = 'none';
+        signupForm.style.display = 'block';
+    } else {
+        signupForm.style.display = 'none';
+        loginForm.style.display = 'block';
+    }
+}
+
+async function handleLogin(e) {
+    e.preventDefault();
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const errorEl = document.getElementById('loginError');
+
+    if (!email || !password) {
+        errorEl.textContent = "Please fill in all fields";
+        return;
+    }
+
+    try {
+        const data = await postJSON('/auth/login', { email, password }, false);
+
+        // Store token and user info
+        await setToStorage({
+            access_token: data.access_token,
+            user_email: data.email,
+            user_id: data.user_id,
+            has_resume: data.has_resume,
+            resume_filename: null,
+            plan: data.plan,
+            weekly_usage: data.weekly_usage,
+            weekly_limit: data.weekly_limit,
+        });
+
+        currentUser = { email: data.email, has_resume: data.has_resume, resume_filename: null };
+        showMainApp();
+
+    } catch (error) {
+        errorEl.textContent = error.detail || "Login failed. Please try again.";
+    }
+}
+
+async function handleSignup(e) {
+    e.preventDefault();
+    const email = document.getElementById('signupEmail').value.trim();
+    const password = document.getElementById('signupPassword').value;
+    const fullName = document.getElementById('signupName').value.trim();
+    const errorEl = document.getElementById('signupError');
+
+    if (!email || !password) {
+        errorEl.textContent = "Email and password are required";
+        return;
+    }
+
+    if (password.length < 6) {
+        errorEl.textContent = "Password must be at least 6 characters";
+        return;
+    }
+
+    try {
+        const data = await postJSON('/auth/signup', {
+            email,
+            password,
+            full_name: fullName || null
+        }, false);
+
+        // Store token and user info
+        await setToStorage({
+            access_token: data.access_token,
+            user_email: data.email,
+            user_id: data.user_id,
+            has_resume: data.has_resume,
+            resume_filename: null,
+            plan: data.plan,
+            weekly_usage: data.weekly_usage,
+            weekly_limit: data.weekly_limit,
+        });
+
+        currentUser = { email: data.email, has_resume: data.has_resume, resume_filename: null };
+        showMainApp();
+
+    } catch (error) {
+        errorEl.textContent = error.detail || "Signup failed. Please try again.";
+    }
+}
+
+async function handleLogout() {
+    await chrome.storage.local.clear();
+    currentUser = null;
+    showAuthScreen();
+}
+
+// ============================
+// Resume Upload
+// ============================
+function updateResumeUI(hasResume, filename) {
+    const noState = document.getElementById('noResumeState');
+    const hasState = document.getElementById('hasResumeState');
+    const nameEl = document.getElementById('resumeFilenameText');
+
+    if (hasResume) {
+        noState.style.display = 'none';
+        hasState.style.display = 'block';
+        if (nameEl) nameEl.textContent = filename || 'resume.pdf';
+    } else {
+        noState.style.display = 'block';
+        hasState.style.display = 'none';
+    }
+}
+
+async function handleResumeUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Reset input so same file can be re-selected later
+    e.target.value = '';
+
+    const errorEl = document.getElementById('uploadError');
+    const errorEl2 = document.getElementById('uploadError2');
+    [errorEl, errorEl2].forEach(el => { if (el) el.textContent = ''; });
+
+    // Client-side validation
+    if (file.type !== 'application/pdf') {
+        (errorEl || errorEl2).textContent = 'Only PDF files are supported.';
+        return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+        (errorEl || errorEl2).textContent = 'File must be smaller than 2 MB.';
+        return;
+    }
+
+    // Update label to show uploading state
+    const label = document.getElementById('uploadResumeLabel');
+    const originalLabelHTML = label ? label.innerHTML : '';
+    if (label) label.innerHTML = '<svg class="icon" viewBox="0 0 24 24" fill="currentColor" style="animation:pulse 1s infinite"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Uploading...';
+
+    try {
+        const { access_token } = await getFromStorage(['access_token']);
+        if (!access_token) throw new Error('Not authenticated');
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const res = await fetch(`${API_BASE}/upload-resume`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${access_token}` },
+            body: formData,
+        });
+
+        if (res.status === 401) { await handleLogout(); return; }
+
+        const data = await res.json();
+        if (!res.ok) throw data;
+
+        // Persist to storage and update UI
+        await setToStorage({ has_resume: true, resume_filename: file.name });
+        currentUser = { ...currentUser, has_resume: true, resume_filename: file.name };
+        updateResumeUI(true, file.name);
+
+    } catch (err) {
+        const msg = err.detail || err.message || 'Upload failed. Please try again.';
+        if (errorEl) errorEl.textContent = msg;
+        if (errorEl2) errorEl2.textContent = msg;
+        if (label) label.innerHTML = originalLabelHTML;
+    }
 }
 
 // ============================
@@ -135,22 +377,15 @@ async function handleAnalyzeClick() {
     showLoadingState(btn, 'Analyzing...');
 
     try {
-        const { user_id, resume_id } = await getFromStorage(['user_id', 'resume_id']);
-        if (!user_id || !resume_id) {
-            alert("Missing user_id or resume_id in storage!");
-            return;
-        }
-        const data = await postJSON('/api/analyze-compatibility', {
-            user_id,
-            resume_id,
-            job_description: jobDescriptionFull,
+        const data = await postJSON('/calculate-ats-detailed', {
+            job_desc: jobDescriptionFull,
         });
 
-        document.getElementById('originalScore').textContent = `${data.match_score}%`;
+        document.getElementById('originalScore').textContent = `${Math.round(data.overall_score)}%`;
         updateProgress(2);
         document.getElementById('generateBtn').disabled = false;
     } catch (error) {
-        alert("Error analyzing job: " + (error.error || JSON.stringify(error)));
+        alert("Error analyzing job: " + (error.detail || error.message || JSON.stringify(error)));
     } finally {
         btn.innerHTML = originalText;
     }
@@ -162,104 +397,62 @@ async function handleGenerateClick() {
     showLoadingState(btn, 'Generating...');
 
     try {
-        const { user_id, resume_id } = await getFromStorage(['user_id', 'resume_id']);
-        if (!user_id || !resume_id) {
-            alert("Missing user_id or resume_id in storage!");
-            return;
-        }
-        const data = await postJSON('/api/optimize-resume', {
-            user_id,
-            resume_id,
-            job_description: jobDescriptionFull,
+        const data = await postJSON('/optimize-resume', {
+            job_desc: jobDescriptionFull,
         });
 
-        lastVersionId = data.version_id;
+        // Show optimized score section with actual backend data
+        const originalScore = data.original_score;
+        const optimizedScore = data.optimized_score;
+        showOptimizedScoreSection({ originalScore, optimizedScore, improvements: data.improvements_made });
 
-        // Show optimized score section
-        const originalScore = parseInt(document.getElementById('originalScore').textContent.replace('%', '')) || 60;
-        const optimizedScore = originalScore + Math.floor(Math.random() * 20) + 10; // Backend doesn’t return score yet
-        showOptimizedScoreSection({ originalScore, optimizedScore });
+        // Update generation count display if available
+        if (data.generation_count) {
+            await setToStorage({ generation_count: data.generation_count });
+        }
 
         updateProgress(3);
-        document.getElementById('previewBtn').disabled = false;
-        document.getElementById('downloadBtn').disabled = false;
+        // Preview/Download not yet supported — hide buttons to avoid confusing stubs
+        document.getElementById('previewBtn').style.display = 'none';
+        document.getElementById('downloadBtn').style.display = 'none';
+        updateProgress(5); // Mark complete since download isn't available yet
     } catch (error) {
-        alert("Error generating resume: " + (error.error || JSON.stringify(error)));
+        alert("Error generating resume: " + (error.detail || error.message || JSON.stringify(error)));
     } finally {
         btn.innerHTML = originalText;
     }
 }
 
 async function handlePreviewClick() {
-    if (!lastVersionId) {
-        alert("No optimized version available yet!");
-        return;
-    }
-    window.open(`${API_BASE}/api/preview-resume/${lastVersionId}`, '_blank');
+    alert("Preview feature coming soon!");
 }
 
 async function handleDownloadClick() {
-    const btn = document.getElementById('downloadBtn');
-    const originalText = btn.innerHTML;
-    showLoadingState(btn, 'Preparing...');
-
-    try {
-        if (!lastVersionId) {
-            alert("No optimized version available yet!");
-            return;
-        }
-        const { user_id } = await getFromStorage(['user_id']);
-        const data = await postJSON('/api/generate-resume', {
-            user_id,
-            version_id: lastVersionId,
-            format: "pdf"
-        });
-
-        window.open(`${API_BASE}${data.download_url}`, "_blank");
-        updateProgress(5);
-    } catch (error) {
-        alert("Error downloading resume: " + (error.error || JSON.stringify(error)));
-    } finally {
-        btn.innerHTML = originalText;
-    }
+    alert("Download feature coming soon!");
 }
 
 async function handleRecalculateClick() {
-    const btn = document.getElementById('recalculateBtn');
-    const originalText = btn.innerHTML;
-    showLoadingState(btn, 'Recalculating...');
-
-    try {
-        if (!lastVersionId) {
-            alert("No optimized version available yet!");
-            return;
-        }
-        const res = await fetch(`${API_BASE}/api/recalculate-score/${lastVersionId}`);
-        const data = await res.json();
-        if (!res.ok) throw data;
-
-        document.getElementById('optimizedScore').textContent = `${data.new_score}%`;
-        document.getElementById('improvementText').textContent = `Recalculated Score: ${data.new_score}%`;
-    } catch (error) {
-        alert("Error recalculating score: " + (error.error || JSON.stringify(error)));
-    } finally {
-        btn.innerHTML = originalText;
+    // Re-run analysis with the current job description
+    if (!jobDescriptionFull) {
+        alert("No job description loaded.");
+        return;
     }
+    await handleAnalyzeClick();
 }
 
 // ============================
 // UI Helpers
 // ============================
-function showOptimizedScoreSection({ originalScore, optimizedScore }) {
+function showOptimizedScoreSection({ originalScore, optimizedScore, improvements }) {
     const originalScoreDisplay = document.getElementById('originalScoreDisplay');
     const optimizedScoreDisplay = document.getElementById('optimizedScore');
     const improvementTextEl = document.getElementById('improvementText');
     const improvementIndicator = document.getElementById('improvementIndicator');
 
-    originalScoreDisplay.textContent = `${originalScore}%`;
-    optimizedScoreDisplay.textContent = `${optimizedScore}%`;
+    originalScoreDisplay.textContent = `${Math.round(originalScore)}%`;
+    optimizedScoreDisplay.textContent = `${Math.round(optimizedScore)}%`;
 
-    const improvement = optimizedScore - originalScore;
+    const improvement = Math.round(optimizedScore - originalScore);
     if (improvement > 0) {
         improvementTextEl.textContent = `Improved by ${improvement}%! 🎉`;
         improvementTextEl.className = 'improvement-text positive';

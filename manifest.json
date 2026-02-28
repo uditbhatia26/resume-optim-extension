@@ -9,7 +9,7 @@
         "scripting"
     ],
     "host_permissions": [
-        "http://localhost:5000/*",
+        "http://localhost:8000/*",
         "https://your-domain.com/*"
     ],
     "action": {
