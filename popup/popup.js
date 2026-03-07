@@ -19,6 +19,59 @@ function setToStorage(obj) {
 }
 
 // ============================
+// Session Persistence
+// Keys: session_jd, session_ats_score, session_optimized_score,
+//       session_improvements, session_progress
+// ============================
+async function saveSession(patch) {
+    await setToStorage(patch);
+}
+
+async function restoreSession() {
+    const s = await getFromStorage([
+        'session_jd', 'session_ats_score',
+        'session_optimized_score', 'session_improvements', 'session_progress'
+    ]);
+
+    if (!s.session_jd) return; // Nothing saved yet
+
+    // Restore job description
+    jobDescriptionFull = s.session_jd;
+    displayJobDescription();
+    document.querySelector('.input-section').style.display = 'none';
+    updateProgress(1);
+
+    // Restore ATS score
+    if (s.session_ats_score != null) {
+        document.getElementById('originalScore').textContent = `${Math.round(s.session_ats_score)}%`;
+        document.getElementById('analyzeBtn').disabled = false;
+        document.getElementById('generateBtn').disabled = false;
+        updateProgress(2);
+    } else {
+        document.getElementById('analyzeBtn').disabled = false;
+    }
+
+    // Restore optimization results
+    if (s.session_optimized_score != null) {
+        showOptimizedScoreSection({
+            originalScore: s.session_ats_score,
+            optimizedScore: s.session_optimized_score,
+            improvements: s.session_improvements || []
+        });
+        updateProgress(5);
+        document.getElementById('previewBtn').style.display = 'none';
+        document.getElementById('downloadBtn').style.display = 'none';
+    }
+}
+
+async function clearSession() {
+    await chrome.storage.local.remove([
+        'session_jd', 'session_ats_score',
+        'session_optimized_score', 'session_improvements', 'session_progress'
+    ]);
+}
+
+// ============================
 // API Helpers
 // ============================
 async function postJSON(url, body, requiresAuth = true) {
@@ -73,11 +126,22 @@ async function checkAuthStatus() {
 function showAuthScreen() {
     document.getElementById('authScreen').style.display = 'block';
     document.getElementById('mainApp').style.display = 'none';
+    // Constrain popup height so it doesn't expand infinitely
+    document.documentElement.style.height = '480px';
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.height = '480px';
+    document.body.style.overflow = 'hidden';
 }
 
-function showMainApp() {
+async function showMainApp() {
     document.getElementById('authScreen').style.display = 'none';
-    document.getElementById('mainApp').style.display = 'block';
+    document.getElementById('mainApp').style.display = 'flex';
+
+    // Force popup height — CSS alone is unreliable in Chrome extension popups
+    document.documentElement.style.height = '480px';
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.height = '480px';
+    document.body.style.overflow = 'hidden';
 
     // Show user email
     const userEmailEl = document.getElementById('userEmail');
@@ -87,6 +151,9 @@ function showMainApp() {
 
     // Show correct resume state
     updateResumeUI(currentUser?.has_resume, currentUser?.resume_filename);
+
+    // Restore any saved session (JD, score, progress)
+    await restoreSession();
 }
 
 function initializeEventListeners() {
@@ -218,6 +285,7 @@ async function handleSignup(e) {
 }
 
 async function handleLogout() {
+    await clearSession();
     await chrome.storage.local.clear();
     currentUser = null;
     showAuthScreen();
@@ -328,6 +396,9 @@ function handleAddJobClick() {
     displayJobDescription();
     updateProgress(1);
 
+    // Persist to session storage
+    saveSession({ session_jd: inputText, session_ats_score: null, session_optimized_score: null, session_progress: 1 });
+
     document.getElementById('analyzeBtn').disabled = false;
 
     textarea.value = '';
@@ -374,6 +445,7 @@ function handleReadMoreClick() {
 async function handleAnalyzeClick() {
     const btn = document.getElementById('analyzeBtn');
     const originalText = btn.innerHTML;
+    btn.disabled = true;
     showLoadingState(btn, 'Analyzing...');
 
     try {
@@ -384,17 +456,28 @@ async function handleAnalyzeClick() {
         document.getElementById('originalScore').textContent = `${Math.round(data.overall_score)}%`;
         updateProgress(2);
         document.getElementById('generateBtn').disabled = false;
+
+        // Persist ATS score so it survives popup close
+        await saveSession({ session_ats_score: data.overall_score, session_progress: 2 });
+
+        // Scroll to score card so user can see the result
+        setTimeout(() => {
+            document.getElementById('originalScore')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+
     } catch (error) {
-        alert("Error analyzing job: " + (error.detail || error.message || JSON.stringify(error)));
+        alert('Error analyzing: ' + (error.detail || error.message || JSON.stringify(error)));
     } finally {
         btn.innerHTML = originalText;
+        btn.disabled = false;
     }
 }
 
 async function handleGenerateClick() {
     const btn = document.getElementById('generateBtn');
     const originalText = btn.innerHTML;
-    showLoadingState(btn, 'Generating...');
+    btn.disabled = true;
+    showLoadingState(btn, 'Generating... (this takes ~30s)');
 
     try {
         const data = await postJSON('/optimize-resume', {
@@ -406,20 +489,29 @@ async function handleGenerateClick() {
         const optimizedScore = data.optimized_score;
         showOptimizedScoreSection({ originalScore, optimizedScore, improvements: data.improvements_made });
 
-        // Update generation count display if available
-        if (data.generation_count) {
-            await setToStorage({ generation_count: data.generation_count });
-        }
+        // Persist optimization results so they survive popup close
+        await saveSession({
+            session_optimized_score: optimizedScore,
+            session_improvements: data.improvements_made || [],
+            session_progress: 5,
+        });
 
         updateProgress(3);
         // Preview/Download not yet supported — hide buttons to avoid confusing stubs
         document.getElementById('previewBtn').style.display = 'none';
         document.getElementById('downloadBtn').style.display = 'none';
         updateProgress(5); // Mark complete since download isn't available yet
+
+        // Scroll to optimization results
+        setTimeout(() => {
+            document.getElementById('optimizedScoreSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 200);
+
     } catch (error) {
-        alert("Error generating resume: " + (error.detail || error.message || JSON.stringify(error)));
+        alert('Error generating resume: ' + (error.detail || error.message || JSON.stringify(error)));
     } finally {
         btn.innerHTML = originalText;
+        btn.disabled = false;
     }
 }
 
