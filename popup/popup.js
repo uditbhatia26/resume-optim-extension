@@ -1,13 +1,30 @@
 // ============================
 // Global variables
 // ============================
+const API_BASE = "http://localhost:8000"; // ← swap to production URL before deploying
 let jobDescriptionFull = "";
 let isExpanded = false;
 let currentUser = null;
 
 // ============================
-// Storage Helpers
+// Helpers
 // ============================
+
+/** Safely extract a human-readable message from a FastAPI error payload. */
+function apiErrorMessage(error, fallback) {
+    if (!error) return fallback;
+    // String detail (most auth errors)
+    if (typeof error.detail === "string") return error.detail;
+    // Array of validation errors (422 Unprocessable Entity)
+    if (Array.isArray(error.detail)) {
+        return error.detail.map((e) => e.msg || JSON.stringify(e)).join(", ");
+    }
+    // Plain Error object
+    if (error.message) return error.message;
+    return fallback;
+}
+
+
 function getFromStorage(keys) {
     return new Promise((resolve) => chrome.storage.local.get(keys, resolve));
 }
@@ -53,9 +70,20 @@ async function restoreSession() {
         "session_ats_score", "session_optimized_score",
         "session_improvements", "session_progress",
         "session_optimized_yaml", "optimization_status", "optimization_error",
+        "analyze_status", "analyze_error",
+        "upload_status",  "upload_error",  "upload_filename",
     ]);
 
-    if (!s.session_jd) return; // Nothing saved yet
+    // ---- Restore upload state ----
+    if (s.upload_status === "running") {
+        showUploadingState(true, s.upload_filename);
+        startUploadPoller();
+    } else if (s.upload_status === "error") {
+        showUploadError(s.upload_error || "Upload failed.");
+    }
+    // upload_status === "done" is already reflected in has_resume (set by background)
+
+    if (!s.session_jd) return; // Nothing else to restore
 
     // Restore job description
     jobDescriptionFull = s.session_jd;
@@ -63,8 +91,17 @@ async function restoreSession() {
     document.querySelector(".input-section").style.display = "none";
     updateProgress(1);
 
-    // Restore ATS score
-    if (s.session_ats_score != null) {
+    // ---- Restore analyze state ----
+    if (s.analyze_status === "running") {
+        const btn = document.getElementById("analyzeBtn");
+        btn.disabled = true;
+        showLoadingState(btn, "Analyzing...");
+        TaskProgress.start("Analyzing resume compatibility", 15_000);
+        startAnalyzePoller();
+    } else if (s.analyze_status === "error") {
+        showError("Analysis failed: " + (s.analyze_error || "Unknown error"));
+        document.getElementById("analyzeBtn").disabled = false;
+    } else if (s.session_ats_score != null) {
         document.getElementById("originalScore").textContent = `${Math.round(s.session_ats_score)}%`;
         document.getElementById("analyzeBtn").disabled = false;
         document.getElementById("generateBtn").disabled = false;
@@ -73,26 +110,109 @@ async function restoreSession() {
         document.getElementById("analyzeBtn").disabled = false;
     }
 
-    // Restore optimization result (or show "still running" state)
-    if (s.optimization_status === "running") {
-        // Popup reopened while background is still working — show spinner
-        setGenerateButtonRunning(true);
-    } else if (s.optimization_status === "error") {
-        const errMsg = s.optimization_error || "Unknown error during optimization.";
-        showError(`Optimization failed: ${errMsg}`);
-        setGenerateButtonRunning(false);
-    } else if (s.session_optimized_score != null) {
-        showOptimizedScoreSection({
-            originalScore:  s.session_ats_score,
-            optimizedScore: s.session_optimized_score,
-            improvements:   s.session_improvements || [],
+    // ---- Restore optimization state ----
+    if (s.optimization_status === "done" && s.session_optimized_score != null) {
+        handleOptimizeDone({
+            original_score:    s.session_ats_score  ?? 0,
+            optimized_score:   s.session_optimized_score,
+            improvements_made: s.session_improvements || [],
         });
-        updateProgress(5);
-        document.getElementById("previewBtn").style.display = "none";
-        document.getElementById("downloadBtn").style.display = "inline-flex";
-        document.getElementById("downloadBtn").disabled = false;
+    } else if (s.optimization_status === "running") {
+        setGenerateButtonRunning(true);
+        TaskProgress.start("Generating optimized resume", 40_000);
+        startResultPoller();
+    } else if (s.optimization_status === "error") {
+        showError(`Optimization failed: ${s.optimization_error || "Unknown error"}`);
+        setGenerateButtonRunning(false);
+    }
+
+    // Safety net: always unlock Download if YAML is already in storage
+    if (s.session_optimized_yaml) {
+        const dlBtn = document.getElementById("downloadBtn");
+        if (dlBtn) { dlBtn.style.display = "inline-flex"; dlBtn.disabled = false; }
     }
 }
+
+
+let _resultPollerTimer  = null;
+let _uploadPollerTimer  = null;
+let _analyzePollerTimer = null;
+
+/** Poll until upload completes or errors. */
+function startUploadPoller() {
+    if (_uploadPollerTimer) return;
+    _uploadPollerTimer = setInterval(async () => {
+        const s = await getFromStorage(["upload_status", "upload_error", "resume_filename"]);
+        if (s.upload_status === "done") {
+            clearInterval(_uploadPollerTimer); _uploadPollerTimer = null;
+            handleUploadDone(s.resume_filename || "resume.pdf");
+        } else if (s.upload_status === "error") {
+            clearInterval(_uploadPollerTimer); _uploadPollerTimer = null;
+            handleUploadError(s.upload_error || "Upload failed.");
+        }
+    }, 1000);
+}
+function stopUploadPoller() {
+    clearInterval(_uploadPollerTimer); _uploadPollerTimer = null;
+}
+
+/** Poll until ATS analysis completes or errors. */
+function startAnalyzePoller() {
+    if (_analyzePollerTimer) return;
+    _analyzePollerTimer = setInterval(async () => {
+        const s = await getFromStorage(["analyze_status", "analyze_error", "session_ats_score"]);
+        if (s.analyze_status === "done" && s.session_ats_score != null) {
+            clearInterval(_analyzePollerTimer); _analyzePollerTimer = null;
+            handleAnalyzeDone(s.session_ats_score);
+        } else if (s.analyze_status === "error") {
+            clearInterval(_analyzePollerTimer); _analyzePollerTimer = null;
+            handleAnalyzeError(s.analyze_error || "Unknown error");
+        }
+    }, 1000);
+}
+function stopAnalyzePoller() {
+    clearInterval(_analyzePollerTimer); _analyzePollerTimer = null;
+}
+
+function stopResultPoller() {
+    clearInterval(_resultPollerTimer); _resultPollerTimer = null;
+}
+
+/** Poll until optimization completes or errors (catches missed OPTIMIZE_DONE push). */
+function startResultPoller() {
+    if (_resultPollerTimer) return; // already polling
+    console.log("[POLLER] Starting result poller");
+    _resultPollerTimer = setInterval(async () => {
+        const s = await getFromStorage([
+            "optimization_status", "optimization_error",
+            "session_optimized_score", "session_ats_score",
+            "session_improvements",
+        ]);
+        console.log("[POLLER] tick:", JSON.stringify({
+            status: s.optimization_status,
+            score: s.session_optimized_score,
+            ats: s.session_ats_score,
+        }));
+
+        if (s.optimization_status === "done" && s.session_optimized_score != null) {
+            console.log("[POLLER] Detected DONE — calling handleOptimizeDone");
+            clearInterval(_resultPollerTimer);
+            _resultPollerTimer = null;
+            handleOptimizeDone({
+                original_score:   s.session_ats_score,
+                optimized_score:  s.session_optimized_score,
+                improvements_made: s.session_improvements || [],
+            });
+        } else if (s.optimization_status === "error") {
+            console.log("[POLLER] Detected ERROR");
+            clearInterval(_resultPollerTimer);
+            _resultPollerTimer = null;
+            handleOptimizeError(s.optimization_error || "Unknown error during optimization.");
+        }
+        // still "running" → keep polling
+    }, 1000);
+}
+
 
 async function clearSession() {
     await chrome.storage.local.remove([
@@ -102,6 +222,85 @@ async function clearSession() {
         "session_optimized_yaml", "optimization_status", "optimization_error",
     ]);
 }
+
+// ============================
+// Task Progress Bar
+// ============================
+const TaskProgress = {
+    _timer:    null,
+    _start:    0,
+    _duration: 0,
+    _pct:      0,
+
+    /**
+     * Start the progress bar.
+     * @param {string} label      - e.g. "Analyzing resume…"
+     * @param {number} durationMs - expected total duration (ms). Bar reaches ~90% at this point.
+     */
+    start(label, durationMs) {
+        this.stop();
+        this._start    = Date.now();
+        this._duration = durationMs;
+        this._pct      = 0;
+
+        const wrap  = document.getElementById("taskProgressWrap");
+        const bar   = document.getElementById("taskProgressBar");
+        const pctEl = document.getElementById("taskProgressPct");
+        const lbl   = document.getElementById("taskProgressLabel");
+        const eta   = document.getElementById("taskProgressEta");
+
+        if (!wrap) return;
+        wrap.style.display  = "block";
+        lbl.textContent     = label;
+        bar.style.width     = "0%";
+        pctEl.textContent   = "0%";
+        eta.textContent     = "";
+
+        this._timer = setInterval(() => {
+            const elapsed  = Date.now() - this._start;
+            const ratio    = Math.min(elapsed / this._duration, 1);
+            // Ease-out: fast start, slow near the end — caps at 90%
+            const eased    = (1 - Math.pow(1 - ratio, 3)) * 90;
+            this._pct      = Math.round(eased);
+
+            bar.style.width   = `${this._pct}%`;
+            pctEl.textContent = `${this._pct}%`;
+
+            const remaining = Math.max(0, Math.round((this._duration - elapsed) / 1000));
+            eta.textContent = remaining > 0 ? `~${remaining}s remaining` : "Almost done…";
+        }, 400);
+    },
+
+    /** Snap to 100% and hide after a short delay. */
+    done() {
+        clearInterval(this._timer);
+        this._timer = null;
+
+        const bar   = document.getElementById("taskProgressBar");
+        const pctEl = document.getElementById("taskProgressPct");
+        const eta   = document.getElementById("taskProgressEta");
+        const wrap  = document.getElementById("taskProgressWrap");
+
+        if (!bar) return;
+        bar.style.width   = "100%";
+        pctEl.textContent = "100%";
+        if (eta) eta.textContent = "Done!";
+
+        setTimeout(() => {
+            if (wrap) wrap.style.display = "none";
+            if (bar)  bar.style.width    = "0%";
+        }, 900);
+    },
+
+    /** Hide immediately (e.g. on error). */
+    stop() {
+        clearInterval(this._timer);
+        this._timer = null;
+        const wrap = document.getElementById("taskProgressWrap");
+        if (wrap) wrap.style.display = "none";
+    },
+};
+
 
 // ============================
 // Initialize
@@ -124,20 +323,47 @@ async function checkAuthStatus() {
     }
 }
 
-/** Listen for progress / result messages pushed by the background worker. */
+/** Listen for push notifications from the background worker. */
 function listenToBackground() {
     chrome.runtime.onMessage.addListener((message) => {
         switch (message.type) {
+            // ---- Upload ----
+            case "UPLOAD_PROGRESS":
+                showUploadingState(true);
+                break;
+            case "UPLOAD_DONE":
+                stopUploadPoller();
+                handleUploadDone(message.payload.filename);
+                break;
+            case "UPLOAD_ERROR":
+                stopUploadPoller();
+                handleUploadError(message.error);
+                break;
+
+            // ---- Analyze ----
+            case "ANALYZE_PROGRESS":
+                // already showing via button spinner — nothing extra needed
+                break;
+            case "ANALYZE_DONE":
+                stopAnalyzePoller();
+                handleAnalyzeDone(message.payload.overall_score);
+                break;
+            case "ANALYZE_ERROR":
+                stopAnalyzePoller();
+                handleAnalyzeError(message.error);
+                break;
+
+            // ---- Optimize ----
             case "OPTIMIZE_PROGRESS":
-                // Currently only "started" — extend for granular steps later
                 setGenerateButtonRunning(true);
                 break;
-
             case "OPTIMIZE_DONE":
+                console.log("[MSG] Received OPTIMIZE_DONE push", message.payload);
+                stopResultPoller(); // cancel poller so it doesn't double-fire
                 handleOptimizeDone(message.payload);
                 break;
-
             case "OPTIMIZE_ERROR":
+                stopResultPoller();
                 handleOptimizeError(message.error);
                 break;
         }
@@ -215,12 +441,16 @@ async function handleLogin(e) {
     const email     = document.getElementById("loginEmail").value.trim();
     const password  = document.getElementById("loginPassword").value;
     const errorEl   = document.getElementById("loginError");
+    const btn       = document.getElementById("loginBtn");
 
     if (!email || !password) { errorEl.textContent = "Please fill in all fields"; return; }
 
+    errorEl.textContent = "";
+    btn.disabled     = true;
+    btn.textContent  = "Signing in…";
+
     try {
-        // Auth calls are short and safe to run directly from the popup
-        const res = await fetch("http://localhost:8000/auth/login", {
+        const res = await fetch(`${API_BASE}/auth/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email, password }),
@@ -241,7 +471,9 @@ async function handleLogin(e) {
         currentUser = { email: data.email, has_resume: data.has_resume, resume_filename: null };
         showMainApp();
     } catch (error) {
-        errorEl.textContent = error.detail || "Login failed. Please try again.";
+        errorEl.textContent = apiErrorMessage(error, "Login failed. Please try again.");
+        btn.disabled    = false;
+        btn.textContent = "Sign In";
     }
 }
 
@@ -251,12 +483,17 @@ async function handleSignup(e) {
     const password = document.getElementById("signupPassword").value;
     const fullName = document.getElementById("signupName").value.trim();
     const errorEl  = document.getElementById("signupError");
+    const btn      = document.getElementById("signupBtn");
 
     if (!email || !password) { errorEl.textContent = "Email and password are required"; return; }
     if (password.length < 6)  { errorEl.textContent = "Password must be at least 6 characters"; return; }
 
+    errorEl.textContent = "";
+    btn.disabled    = true;
+    btn.textContent = "Creating account…";
+
     try {
-        const res = await fetch("http://localhost:8000/auth/signup", {
+        const res = await fetch(`${API_BASE}/auth/signup`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email, password, full_name: fullName || null }),
@@ -277,7 +514,9 @@ async function handleSignup(e) {
         currentUser = { email: data.email, has_resume: data.has_resume, resume_filename: null };
         showMainApp();
     } catch (error) {
-        errorEl.textContent = error.detail || "Signup failed. Please try again.";
+        errorEl.textContent = apiErrorMessage(error, "Signup failed. Please try again.");
+        btn.disabled    = false;
+        btn.textContent = "Create Account";
     }
 }
 
@@ -324,39 +563,71 @@ async function handleResumeUpload(e) {
         return;
     }
 
-    const label = document.getElementById("uploadResumeLabel");
-    const originalLabelHTML = label ? label.innerHTML : "";
-    if (label)
-        label.innerHTML =
-            '<svg class="icon" viewBox="0 0 24 24" fill="currentColor" style="animation:pulse 1s infinite"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Uploading...';
+    // Client-side size cap before wasting time on base64 conversion
+    if (file.size > 3 * 1024 * 1024) {
+        showUploadError("File must be smaller than 2 MB.");
+        return;
+    }
 
-    try {
-        const { access_token } = await getFromStorage(["access_token"]);
-        if (!access_token) throw new Error("Not authenticated");
+    // Show uploading state immediately
+    showUploadingState(true, file.name);
 
-        const formData = new FormData();
-        formData.append("file", file);
+    // Convert PDF to base64 so it crosses the message boundary to the background worker
+    const reader = new FileReader();
+    reader.onload = async function (evt) {
+        // btoa loop avoids call-stack overflow on large files
+        const buf    = evt.target.result;
+        const bytes  = new Uint8Array(buf);
+        let binary   = "";
+        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+        const base64 = btoa(binary);
 
-        const res = await fetch("http://localhost:8000/upload-resume", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${access_token}` },
-            body: formData,
+        // Fire-and-forget — background handles the actual POST
+        chrome.runtime.sendMessage({
+            type: "UPLOAD_RESUME",
+            payload: { base64, filename: file.name },
         });
 
-        if (res.status === 401) { await handleLogout(); return; }
-        const data = await res.json();
-        if (!res.ok) throw data;
+        // Poll storage every second so we catch the result if the popup is closed
+        startUploadPoller();
+    };
+    reader.onerror = () => showUploadError("Could not read the file. Please try again.");
+    reader.readAsArrayBuffer(file);
+}
 
-        await setToStorage({ has_resume: true, resume_filename: file.name });
-        currentUser = { ...currentUser, has_resume: true, resume_filename: file.name };
-        updateResumeUI(true, file.name);
-    } catch (err) {
-        const msg = err.detail || err.message || "Upload failed. Please try again.";
-        if (errorEl)  errorEl.textContent  = msg;
-        if (errorEl2) errorEl2.textContent = msg;
-        if (label) label.innerHTML = originalLabelHTML;
+/** Show / hide the uploading spinner state on the upload label. */
+function showUploadingState(on, filename) {
+    const label = document.getElementById("uploadResumeLabel");
+    if (!label) return;
+    if (on) {
+        label._originalHTML = label._originalHTML || label.innerHTML;
+        label.innerHTML =
+            '<svg class="icon" viewBox="0 0 24 24" fill="currentColor" style="animation:pulse 1s infinite"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>' +
+            (filename ? `Uploading ${filename}…` : "Uploading…");
+    } else if (label._originalHTML) {
+        label.innerHTML    = label._originalHTML;
+        label._originalHTML = null;
     }
 }
+
+function showUploadError(msg) {
+    showUploadingState(false);
+    const el = document.getElementById("uploadError2") || document.getElementById("uploadError");
+    if (el) el.textContent = msg;
+}
+
+function handleUploadDone(filename) {
+    showUploadingState(false);
+    setToStorage({ upload_status: null }).catch(() => {});
+    currentUser = { ...currentUser, has_resume: true, resume_filename: filename };
+    updateResumeUI(true, filename);
+}
+
+function handleUploadError(msg) {
+    showUploadError(apiErrorMessage({ detail: msg }, "Upload failed. Please try again."));
+    setToStorage({ upload_status: null }).catch(() => {});
+}
+
 
 // ============================
 // Event Handlers
@@ -455,46 +726,52 @@ function handleReadMoreClick() {
  */
 async function handleAnalyzeClick() {
     const btn = document.getElementById("analyzeBtn");
-    const originalText = btn.innerHTML;
     btn.disabled = true;
     showLoadingState(btn, "Analyzing...");
+    TaskProgress.start("Analyzing resume compatibility", 15_000);
 
-    try {
-        // Read cached JD parse ID (background warmed this when user added the JD)
-        const { session_jd_cache_id } = await getFromStorage(["session_jd_cache_id"]);
+    const { session_jd_cache_id } = await getFromStorage(["session_jd_cache_id"]);
 
-        const data = await sendToBackground({
-            type: "ANALYZE_ATS",
-            payload: {
-                job_desc:    jobDescriptionFull,
-                jd_cache_id: session_jd_cache_id || null,
-            },
-        });
+    // Fire-and-forget — background writes result to storage
+    chrome.runtime.sendMessage({
+        type: "ANALYZE_ATS",
+        payload: {
+            job_desc:    jobDescriptionFull,
+            jd_cache_id: session_jd_cache_id || null,
+        },
+    });
 
-        const atsScore = data.overall_score;
-        document.getElementById("originalScore").textContent = `${Math.round(atsScore)}%`;
-        updateProgress(2);
-        document.getElementById("generateBtn").disabled = false;
+    // Poll storage every second (catches result even if popup closes and reopens)
+    startAnalyzePoller();
+}
 
-        // Persist score so it survives popup close + generate step can reuse it
-        await saveSession({ session_ats_score: atsScore, session_progress: 2 });
-
-        setTimeout(() => {
-            document.getElementById("originalScore")?.scrollIntoView({
-                behavior: "smooth",
-                block: "center",
-            });
-        }, 100);
-    } catch (error) {
-        if (error?.message === "SESSION_EXPIRED") {
-            await handleLogout();
-            return;
-        }
-        showError("Error analyzing: " + (error?.detail || error?.message || JSON.stringify(error)));
-    } finally {
-        btn.innerHTML = originalText;
-        btn.disabled  = false;
+function handleAnalyzeDone(atsScore) {
+    TaskProgress.done();
+    const btn = document.getElementById("analyzeBtn");
+    if (btn) {
+        btn.innerHTML = btn._origHTML ||
+            '<svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Analyze Compatibility';
+        btn.disabled = false;
     }
+    document.getElementById("originalScore").textContent = `${Math.round(atsScore)}%`;
+    updateProgress(2);
+    document.getElementById("generateBtn").disabled = false;
+    saveSession({ session_ats_score: atsScore, session_progress: 2, analyze_status: "done" }).catch(() => {});
+    setTimeout(() => {
+        document.getElementById("originalScore")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 100);
+}
+
+function handleAnalyzeError(errMsg) {
+    TaskProgress.stop();
+    const btn = document.getElementById("analyzeBtn");
+    if (btn) {
+        btn.innerHTML = btn._origHTML ||
+            '<svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Analyze Compatibility';
+        btn.disabled = false;
+    }
+    if (errMsg === "SESSION_EXPIRED") { handleLogout(); return; }
+    showError("Error analyzing: " + errMsg);
 }
 
 /**
@@ -509,6 +786,7 @@ async function handleGenerateClick() {
 
     setGenerateButtonRunning(true);
     await saveSession({ optimization_status: "running" });
+    TaskProgress.start("Generating optimized resume", 40_000);
 
     // Fire-and-forget — background manages the 30-second request
     chrome.runtime.sendMessage({
@@ -519,17 +797,34 @@ async function handleGenerateClick() {
             original_ats_score: session_ats_score   || null,
         },
     });
-    // sendResponse will be called with { started: true } — we don't need it here
+
+    // Start polling storage — catches the result whether or not the
+    // OPTIMIZE_DONE push message arrives (MV3 service worker timing)
+    startResultPoller();
 }
 
 function handleOptimizeDone(data) {
+    console.log("[handleOptimizeDone] called with:", JSON.stringify(data));
+    stopResultPoller();          // idempotent — safe to call even if timer is null
+    TaskProgress.done();
     setGenerateButtonRunning(false);
 
+    const origScore = data.original_score  ?? data.originalScore  ?? 0;
+    const optScore  = data.optimized_score ?? data.optimizedScore ?? 0;
+    const improvements = data.improvements_made || data.improvements || [];
+
     showOptimizedScoreSection({
-        originalScore:  data.original_score,
-        optimizedScore: data.optimized_score,
-        improvements:   data.improvements_made || [],
+        originalScore:  origScore,
+        optimizedScore: optScore,
+        improvements,
     });
+
+    // Persist so the safety-net in restoreSession also finds YAML
+    saveSession({
+        optimization_status:     "done",
+        session_optimized_score: optScore,
+        session_improvements:    improvements,
+    }).catch(() => {});
 
     updateProgress(3);
     document.getElementById("previewBtn").style.display  = "none";
@@ -546,6 +841,7 @@ function handleOptimizeDone(data) {
 }
 
 function handleOptimizeError(errMsg) {
+    TaskProgress.stop();
     setGenerateButtonRunning(false);
     showError("Optimization failed: " + errMsg);
 }
@@ -555,22 +851,56 @@ async function handlePreviewClick() {
 }
 
 async function handleDownloadClick() {
-    const s = await getFromStorage(["session_optimized_yaml"]);
-    if (!s.session_optimized_yaml) {
-        alert("No optimized resume found. Please generate one first.");
-        return;
-    }
+    const btn = document.getElementById("downloadBtn");
+    const originalHTML = btn.innerHTML;
+    btn.disabled = true;
+    showLoadingState(btn, "Generating PDF…");
 
-    const blob = new Blob([s.session_optimized_yaml], { type: "text/yaml" });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement("a");
-    a.href     = url;
-    a.download = "optimized_resume.yaml";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    try {
+        const { access_token, session_optimized_yaml } =
+            await getFromStorage(["access_token", "session_optimized_yaml"]);
+
+        if (!access_token) { await handleLogout(); return; }
+
+        // Send the optimized YAML if available; backend falls back to base resume
+        const body = session_optimized_yaml
+            ? JSON.stringify({ resume_yaml: session_optimized_yaml })
+            : "{}";
+
+        const res = await fetch(`${API_BASE}/generate-pdf`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${access_token}`,
+            },
+            body,
+        });
+
+        if (res.status === 401) { await handleLogout(); return; }
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || "PDF generation failed.");
+        }
+
+        // Stream the blob and trigger a native Save dialog
+        const blob = await res.blob();
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement("a");
+        a.href     = url;
+        a.download = "optimized_resume.pdf";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+    } catch (err) {
+        showError("Download failed: " + (err.message || String(err)));
+    } finally {
+        btn.innerHTML = originalHTML;
+        btn.disabled  = false;
+    }
 }
+
 
 async function handleRecalculateClick() {
     if (!jobDescriptionFull) {
