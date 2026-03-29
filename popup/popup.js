@@ -21,7 +21,7 @@ function setToStorage(obj) {
 // ============================
 // Session Persistence
 // Keys: session_jd, session_ats_score, session_optimized_score,
-//       session_improvements, session_progress
+//       session_improvements, session_progress, session_optimized_yaml
 // ============================
 async function saveSession(patch) {
     await setToStorage(patch);
@@ -30,7 +30,7 @@ async function saveSession(patch) {
 async function restoreSession() {
     const s = await getFromStorage([
         'session_jd', 'session_ats_score',
-        'session_optimized_score', 'session_improvements', 'session_progress'
+        'session_optimized_score', 'session_improvements', 'session_progress', 'session_optimized_yaml'
     ]);
 
     if (!s.session_jd) return; // Nothing saved yet
@@ -60,14 +60,15 @@ async function restoreSession() {
         });
         updateProgress(5);
         document.getElementById('previewBtn').style.display = 'none';
-        document.getElementById('downloadBtn').style.display = 'none';
+        document.getElementById('downloadBtn').style.display = 'inline-flex';
+        document.getElementById('downloadBtn').disabled = false;
     }
 }
 
 async function clearSession() {
     await chrome.storage.local.remove([
         'session_jd', 'session_ats_score',
-        'session_optimized_score', 'session_improvements', 'session_progress'
+        'session_optimized_score', 'session_improvements', 'session_progress', 'session_optimized_yaml'
     ]);
 }
 
@@ -493,14 +494,19 @@ async function handleGenerateClick() {
         await saveSession({
             session_optimized_score: optimizedScore,
             session_improvements: data.improvements_made || [],
+            session_optimized_yaml: data.optimized_resume_yaml,
             session_progress: 5,
         });
 
         updateProgress(3);
-        // Preview/Download not yet supported — hide buttons to avoid confusing stubs
+        // Preview not yet supported
         document.getElementById('previewBtn').style.display = 'none';
-        document.getElementById('downloadBtn').style.display = 'none';
-        updateProgress(5); // Mark complete since download isn't available yet
+        
+        // Enable download since we have the YAML
+        document.getElementById('downloadBtn').style.display = 'inline-flex';
+        document.getElementById('downloadBtn').disabled = false;
+        
+        updateProgress(5); // Mark complete
 
         // Scroll to optimization results
         setTimeout(() => {
@@ -520,7 +526,24 @@ async function handlePreviewClick() {
 }
 
 async function handleDownloadClick() {
-    alert("Download feature coming soon!");
+    const s = await getFromStorage(['session_optimized_yaml']);
+    if (!s.session_optimized_yaml) {
+        alert("No optimized resume found. Please generate one first.");
+        return;
+    }
+    
+    // Create a Blob containing the YAML data
+    const blob = new Blob([s.session_optimized_yaml], { type: 'text/yaml' });
+    const url = URL.createObjectURL(blob);
+    
+    // Create a temporary anchor to trigger the download
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'optimized_resume.yaml';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }
 
 async function handleRecalculateClick() {
