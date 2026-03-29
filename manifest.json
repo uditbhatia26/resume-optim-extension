@@ -12,6 +12,9 @@
         "http://localhost:8000/*",
         "https://your-domain.com/*"
     ],
+    "background": {
+        "service_worker": "background.js"
+    },
     "icons": {
         "16": "icons/icon16.png",
         "48": "icons/icon48.png",
@@ -29,4 +32,4 @@
     "content_security_policy": {
         "extension_pages": "script-src 'self'; object-src 'self'"
     }
-}
+}
