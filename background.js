@@ -57,24 +57,25 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             handleParseJD(message.payload).then(sendResponse).catch((err) => {
                 sendResponse({ error: err?.detail || err?.message || String(err) });
             });
-            return true; // keep port open for async sendResponse
+            return true;
 
         case "ANALYZE_ATS":
-            // Fire-and-forget — result written to storage + popup notified
-            handleAnalyzeATS(message.payload);
-            sendResponse({ started: true });
-            return false;
+            handleAnalyzeATS(message.payload)
+                .then(() => sendResponse({ started: true }))
+                .catch(() => sendResponse({ started: true }));
+            return true; // ← changed from false
 
         case "OPTIMIZE_RESUME":
-            handleOptimizeResume(message.payload);
-            sendResponse({ started: true });
-            return false;
+            handleOptimizeResume(message.payload)
+                .then(() => sendResponse({ started: true }))
+                .catch(() => sendResponse({ started: true }));
+            return true; // ← changed from false
 
         case "UPLOAD_RESUME":
-            // PDF passed as base64 string (serializable across message boundary)
-            handleUploadResume(message.payload);
-            sendResponse({ started: true });
-            return false;
+            handleUploadResume(message.payload)
+                .then(() => sendResponse({ started: true }))
+                .catch(() => sendResponse({ started: true }));
+            return true; // ← changed from false
 
         default:
             return false;
@@ -102,7 +103,7 @@ async function handleAnalyzeATS({ job_desc, jd_cache_id }) {
             body: { job_desc, jd_cache_id },
         });
         await setToStorage({
-            analyze_status:    "done",
+            analyze_status: "done",
             session_ats_score: data.overall_score,
         });
         notifyPopup({ type: "ANALYZE_DONE", payload: data });
@@ -123,13 +124,13 @@ async function handleOptimizeResume({ job_desc, jd_cache_id, original_ats_score 
             body: { job_desc, jd_cache_id, original_ats_score },
         });
         await setToStorage({
-            optimization_status:     "done",
+            optimization_status: "done",
             session_optimized_score: data.optimized_score,
-            session_improvements:    data.improvements_made,
-            session_optimized_yaml:  data.optimized_resume_yaml,
-            session_progress:        5,
-            weekly_usage:            data.weekly_usage,
-            weekly_limit:            data.weekly_limit,
+            session_improvements: data.improvements_made,
+            session_optimized_yaml: data.optimized_resume_yaml,
+            session_progress: 5,
+            weekly_usage: data.weekly_usage,
+            weekly_limit: data.weekly_limit,
         });
         notifyPopup({ type: "OPTIMIZE_DONE", payload: data });
     } catch (err) {
@@ -161,8 +162,8 @@ async function handleUploadResume({ base64, filename }) {
         await apiFetch("/upload-resume", { isFormData: true, body: formData });
 
         await setToStorage({
-            upload_status:   "done",
-            has_resume:      true,
+            upload_status: "done",
+            has_resume: true,
             resume_filename: filename,
         });
         notifyPopup({ type: "UPLOAD_DONE", payload: { filename } });
