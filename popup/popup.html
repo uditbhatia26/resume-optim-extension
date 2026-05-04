@@ -61,6 +61,24 @@
             </div>
         </div>
 
+        <!-- Usage Meter Strip -->
+        <div id="usageMeter" class="usage-meter" style="display:none;">
+            <div class="usage-meter-item">
+                <span class="usage-meter-label">Today</span>
+                <span class="usage-meter-value" id="usageToday">0</span>
+            </div>
+            <div class="usage-meter-divider"></div>
+            <div class="usage-meter-item">
+                <span class="usage-meter-label">This Month</span>
+                <span class="usage-meter-value" id="usageMonth">0</span>
+            </div>
+            <div class="usage-meter-divider"></div>
+            <div class="usage-meter-item">
+                <span class="usage-meter-label">Weekly limit</span>
+                <span class="usage-meter-value" id="usageWeekly">0 <span id="usageWeeklyLimit" style="opacity:0.5;font-weight:500;"></span></span>
+            </div>
+        </div>
+
         <div class="main-content">
             <!-- Resume Upload Section -->
             <div class="action-section" id="resumeSection">
@@ -177,12 +195,13 @@
                     Generate Optimized Resume
                 </button>
 
-                <button class="btn btn-secondary" id="previewBtn" disabled>
+                <button class="btn btn-secondary coming-soon-btn" id="previewBtn" disabled>
                     <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
                         <circle cx="11" cy="11" r="8" />
                         <path d="m21 21-4.35-4.35" />
                     </svg>
                     Preview Changes
+                    <span class="coming-soon-badge">Soon</span>
                 </button>
 
                 <button class="btn btn-success" id="downloadBtn" disabled>

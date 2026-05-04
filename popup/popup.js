@@ -73,6 +73,7 @@ async function restoreSession() {
         "analyze_status", "analyze_error",
         "upload_status",  "upload_error",  "upload_filename",
         "session_resume_changes",
+        "daily_usage", "monthly_usage", "weekly_usage", "weekly_limit",
     ]);
 
     // ---- Restore upload state ----
@@ -394,6 +395,14 @@ async function showMainApp() {
 
     updateResumeUI(currentUser?.has_resume, currentUser?.resume_filename);
     await restoreSession();
+
+    // Show usage meter from stored auth data
+    updateUsageMeter(
+        currentUser?.daily_usage   ?? 0,
+        currentUser?.monthly_usage ?? 0,
+        currentUser?.weekly_usage  ?? 0,
+        currentUser?.weekly_limit  ?? 5,
+    );
 
     // Auto-probe the active tab for a job description (non-blocking)
     probePageForJD();
@@ -878,6 +887,14 @@ function handleOptimizeDone(data) {
     // Render changelog
     renderChangelog(changes);
 
+    // Update usage meter with fresh counts from the optimize response
+    updateUsageMeter(
+        data.daily_usage   ?? 0,
+        data.monthly_usage ?? 0,
+        data.weekly_usage  ?? 0,
+        data.weekly_limit  ?? 5,
+    );
+
     // Persist so the safety-net in restoreSession also finds YAML
     saveSession({
         optimization_status:     "done",
@@ -969,6 +986,37 @@ async function handleRecalculateClick() {
     }
     await handleAnalyzeClick();
 }
+
+// ============================
+// Usage Meter
+// ============================
+
+/**
+ * Update the usage meter strip with the latest counts.
+ * @param {number} daily    - resumes generated today
+ * @param {number} monthly  - resumes generated this calendar month
+ * @param {number} weekly   - resumes generated this week (for limit display)
+ * @param {number} limit    - weekly plan limit
+ */
+function updateUsageMeter(daily, monthly, weekly, limit) {
+    const meter = document.getElementById("usageMeter");
+    if (!meter) return;
+
+    const todayEl   = document.getElementById("usageToday");
+    const monthEl   = document.getElementById("usageMonth");
+    const weeklyEl  = document.getElementById("usageWeekly");
+    const limitEl   = document.getElementById("usageWeeklyLimit");
+
+    if (todayEl)  todayEl.textContent  = daily;
+    if (monthEl)  monthEl.textContent  = monthly;
+    if (weeklyEl) weeklyEl.firstChild.textContent = weekly + " ";
+    if (limitEl)  limitEl.textContent  = `/ ${limit}`;
+
+    meter.style.display = "flex";
+}
+
+// Coming Soon handler — button is disabled + badged, nothing to do
+function handlePreviewClick() { /* coming soon */ }
 
 // ============================
 // UI Helpers
