@@ -392,6 +392,9 @@ async function showMainApp() {
 
     updateResumeUI(currentUser?.has_resume, currentUser?.resume_filename);
     await restoreSession();
+
+    // Auto-probe the active tab for a job description (non-blocking)
+    probePageForJD();
 }
 
 function initializeEventListeners() {
@@ -410,6 +413,7 @@ function initializeEventListeners() {
     document.getElementById("landingBtn")?.addEventListener("click", handleLandingClick);
     document.getElementById("resumeFileInput")?.addEventListener("change", handleResumeUpload);
     document.getElementById("addJobBtn")?.addEventListener("click", handleAddJobClick);
+    document.getElementById("fetchFromPageBtn")?.addEventListener("click", handleFetchFromPageClick);
     document.getElementById("readMoreBtn")?.addEventListener("click", handleReadMoreClick);
     document.getElementById("analyzeBtn")?.addEventListener("click", handleAnalyzeClick);
     document.getElementById("generateBtn")?.addEventListener("click", handleGenerateClick);
@@ -985,8 +989,95 @@ function updateProgress(step) {
     }
 }
 
+
 function showLoadingState(button, loadingText) {
     const loadingIcon =
         '<svg class="icon" viewBox="0 0 24 24" fill="currentColor" style="animation: pulse 1s infinite;"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
     button.innerHTML = `${loadingIcon}${loadingText}`;
+}
+
+// ============================
+// Fetch JD from Active Page
+// ============================
+
+/**
+ * _Stored_ extracted text from the page so handleFetchFromPageClick
+ * doesn't need to re-query the background.
+ */
+let _pageJDCache = null;
+
+/**
+ * Called automatically when the main app is shown.
+ * Silently probes the active tab and reveals the fetch bar if a JD is found.
+ */
+async function probePageForJD() {
+    // Don't show the bar if a JD is already loaded in this session
+    const { session_jd } = await getFromStorage(["session_jd"]);
+    if (session_jd) return;
+
+    const bar      = document.getElementById("fetchFromPageBar");
+    const label    = document.getElementById("fetchBarLabel");
+    const fetchBtn = document.getElementById("fetchFromPageBtn");
+    if (!bar || !label || !fetchBtn) return;
+
+    // Show bar in "detecting…" state
+    bar.style.display = "flex";
+    label.textContent = "Detecting job description…";
+    fetchBtn.disabled = true;
+
+    try {
+        const result = await sendToBackground({ type: "FETCH_JD", payload: {} });
+        if (result?.text) {
+            _pageJDCache   = result.text;
+            // Truncate label to ~50 chars for display
+            const preview  = result.text.replace(/\s+/g, " ").trim().slice(0, 50);
+            label.textContent = `Found on ${result.source}: "${preview}…"`;
+            fetchBtn.disabled = false;
+        } else {
+            // Nothing found — hide the bar silently
+            bar.style.display = "none";
+        }
+    } catch (_) {
+        // Could not access tab (e.g. chrome:// page, extension page, etc.) — hide silently
+        bar.style.display = "none";
+    }
+}
+
+/**
+ * User clicks "Use from Page" — pre-fills the textarea and submits.
+ */
+async function handleFetchFromPageClick() {
+    const fetchBtn = document.getElementById("fetchFromPageBtn");
+    if (!fetchBtn) return;
+
+    let jdText = _pageJDCache;
+
+    // If cache is stale / missing, re-fetch from background
+    if (!jdText) {
+        fetchBtn.disabled = true;
+        fetchBtn.textContent = "Fetching…";
+        try {
+            const result = await sendToBackground({ type: "FETCH_JD", payload: {} });
+            jdText = result?.text;
+        } catch (err) {
+            fetchBtn.disabled = false;
+            fetchBtn.textContent = "Use from Page";
+            showError("Could not fetch job description: " + (err?.message || String(err)));
+            return;
+        }
+    }
+
+    if (!jdText) {
+        showError("No job description found on this page.");
+        fetchBtn.disabled = false;
+        return;
+    }
+
+    // Stuff the textarea and trigger the normal Add Job flow
+    const textarea = document.getElementById("jobDescriptionInput");
+    if (textarea) {
+        textarea.value = jdText;
+        // Trigger the same handler as "Add Job Description"
+        await handleAddJobClick();
+    }
 }
