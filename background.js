@@ -136,6 +136,7 @@ async function handleOptimizeResume({ job_desc, jd_cache_id, original_ats_score 
             session_optimized_score: data.optimized_score,
             session_improvements: data.improvements_made,
             session_optimized_yaml: data.optimized_resume_yaml,
+            session_resume_changes: data.resume_changes || [],
             session_progress: 5,
             weekly_usage: data.weekly_usage,
             weekly_limit: data.weekly_limit,

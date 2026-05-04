@@ -628,6 +628,124 @@ body {
     background: rgba(138, 43, 226, 0.05);
 }
 
+/* ---- What Changed Changelog Panel ---- */
+.changelog-panel {
+    margin-bottom: 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.02);
+    overflow: hidden;
+    animation: slideIn 0.3s ease-out;
+}
+
+.changelog-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #e6f1ff;
+    transition: background 0.2s;
+}
+
+.changelog-toggle:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.changelog-toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #b794f6;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Rotate chevron when open */
+.changelog-toggle.open .changelog-toggle-label svg {
+    transform: rotate(90deg);
+    transition: transform 0.2s ease;
+}
+.changelog-toggle-label svg {
+    transition: transform 0.2s ease;
+}
+
+.changelog-badge {
+    font-size: 10px;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 99px;
+    background: rgba(255, 107, 107, 0.2);
+    color: #ff6b6b;
+    border: 1px solid rgba(255, 107, 107, 0.3);
+    display: none; /* shown only when critical items exist */
+}
+
+.changelog-body {
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 10px 14px 12px;
+}
+
+.changelog-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.changelog-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.changelog-item-header {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.changelog-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.changelog-item.positive .changelog-dot  { background: #00d4aa; }
+.changelog-item.info     .changelog-dot  { background: #b794f6; }
+.changelog-item.critical .changelog-dot  { background: #ff6b6b; }
+
+.changelog-item.positive .changelog-item-text { color: #b2f5ea; }
+.changelog-item.info     .changelog-item-text { color: #d6bcfa; }
+.changelog-item.critical .changelog-item-text { color: #feb2b2; font-weight: 600; }
+
+.changelog-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding-left: 14px;
+}
+
+.changelog-pill {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 99px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #8892b0;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 /* Progress section */
 .progress-section {
     margin-top: 16px;

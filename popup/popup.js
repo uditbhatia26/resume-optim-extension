@@ -72,6 +72,7 @@ async function restoreSession() {
         "session_optimized_yaml", "optimization_status", "optimization_error",
         "analyze_status", "analyze_error",
         "upload_status",  "upload_error",  "upload_filename",
+        "session_resume_changes",
     ]);
 
     // ---- Restore upload state ----
@@ -116,6 +117,7 @@ async function restoreSession() {
             original_score:    s.session_ats_score  ?? 0,
             optimized_score:   s.session_optimized_score,
             improvements_made: s.session_improvements || [],
+            resume_changes:    s.session_resume_changes || [],
         });
     } else if (s.optimization_status === "running") {
         setGenerateButtonRunning(true);
@@ -421,6 +423,7 @@ function initializeEventListeners() {
     document.getElementById("previewBtn")?.addEventListener("click", handlePreviewClick);
     document.getElementById("downloadBtn")?.addEventListener("click", handleDownloadClick);
     document.getElementById("recalculateBtn")?.addEventListener("click", handleRecalculateClick);
+    document.getElementById("changelogToggle")?.addEventListener("click", handleChangelogToggle);
 
     const jobDescInput = document.getElementById("jobDescriptionInput");
     if (jobDescInput) jobDescInput.addEventListener("input", handleJobDescriptionInputChange);
@@ -864,6 +867,7 @@ function handleOptimizeDone(data) {
     const origScore = data.original_score  ?? data.originalScore  ?? 0;
     const optScore  = data.optimized_score ?? data.optimizedScore ?? 0;
     const improvements = data.improvements_made || data.improvements || [];
+    const changes      = data.resume_changes || [];
 
     showOptimizedScoreSection({
         originalScore:  origScore,
@@ -871,11 +875,15 @@ function handleOptimizeDone(data) {
         improvements,
     });
 
+    // Render changelog
+    renderChangelog(changes);
+
     // Persist so the safety-net in restoreSession also finds YAML
     saveSession({
         optimization_status:     "done",
         session_optimized_score: optScore,
         session_improvements:    improvements,
+        session_resume_changes:  changes,
     }).catch(() => {});
 
     updateProgress(3);
@@ -1128,4 +1136,99 @@ async function handleFetchFromPageClick() {
         // Trigger the same handler as "Add Job Description"
         await handleAddJobClick();
     }
+}
+
+// ============================
+// Changelog / What Changed Panel
+// ============================
+
+/**
+ * Renders the "What Changed" changelog panel from the backend diff data.
+ * @param {Array<{severity: string, label: string, items: string[]|null}>} changes
+ */
+function renderChangelog(changes) {
+    const panel  = document.getElementById("changelogPanel");
+    const list   = document.getElementById("changelogList");
+    const badge  = document.getElementById("changelogBadge");
+    const toggle = document.getElementById("changelogToggle");
+    const body   = document.getElementById("changelogBody");
+
+    if (!panel || !list || !changes || changes.length === 0) return;
+
+    list.innerHTML = "";
+
+    let criticalCount = 0;
+
+    for (const change of changes) {
+        const { severity, label, items } = change;
+        if (severity === "critical") criticalCount++;
+
+        const li = document.createElement("li");
+        li.className = `changelog-item ${severity}`;
+
+        // Header row: dot + text
+        const header = document.createElement("div");
+        header.className = "changelog-item-header";
+
+        const dot = document.createElement("span");
+        dot.className = "changelog-dot";
+
+        const text = document.createElement("span");
+        text.className = "changelog-item-text";
+        text.textContent = label;
+
+        header.appendChild(dot);
+        header.appendChild(text);
+        li.appendChild(header);
+
+        // Optional pill tags for item lists (e.g. skill names)
+        if (items && items.length > 0) {
+            const pills = document.createElement("div");
+            pills.className = "changelog-pills";
+            // Show max 8 pills to avoid overflow
+            const visible = items.slice(0, 8);
+            for (const item of visible) {
+                const pill = document.createElement("span");
+                pill.className = "changelog-pill";
+                pill.textContent = item;
+                pills.appendChild(pill);
+            }
+            if (items.length > 8) {
+                const more = document.createElement("span");
+                more.className = "changelog-pill";
+                more.textContent = `+${items.length - 8} more`;
+                pills.appendChild(more);
+            }
+            li.appendChild(pills);
+        }
+
+        list.appendChild(li);
+    }
+
+    // Show critical badge if needed
+    if (criticalCount > 0) {
+        badge.textContent  = `${criticalCount} critical`;
+        badge.style.display = "inline-block";
+    } else {
+        badge.style.display = "none";
+    }
+
+    panel.style.display = "block";
+
+    // Auto-expand the body if there are critical items
+    if (criticalCount > 0) {
+        body.style.display = "block";
+        toggle.classList.add("open");
+    }
+}
+
+/** Toggle open/close of the changelog body. */
+function handleChangelogToggle() {
+    const body   = document.getElementById("changelogBody");
+    const toggle = document.getElementById("changelogToggle");
+    if (!body || !toggle) return;
+
+    const isOpen = body.style.display !== "none";
+    body.style.display = isOpen ? "none" : "block";
+    toggle.classList.toggle("open", !isOpen);
 }
