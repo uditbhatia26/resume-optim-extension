@@ -77,6 +77,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                 .catch(() => sendResponse({ started: true }));
             return true; // ← changed from false
 
+        case "FETCH_JD":
+            handleFetchJD(message.payload)
+                .then(sendResponse)
+                .catch((err) => {
+                    sendResponse({ error: err?.message || String(err) });
+                });
+            return true;
+
         default:
             return false;
     }
@@ -172,4 +180,39 @@ async function handleUploadResume({ base64, filename }) {
         await setToStorage({ upload_status: "error", upload_error: errMsg });
         notifyPopup({ type: "UPLOAD_ERROR", error: errMsg });
     }
+}
+
+// ============================================================
+// FETCH_JD — extract job description from the active tab
+// ============================================================
+
+/**
+ * Injects extractJobDescription() into the active tab via chrome.scripting
+ * and returns { text, source } or throws if extraction fails / no tab found.
+ */
+async function handleFetchJD({ tabId } = {}) {
+    const id = tabId ?? (await getActiveTabId());
+    if (!id) throw new Error("No active tab found.");
+
+    const results = await chrome.scripting.executeScript({
+        target: { tabId: id },
+        func: () => {
+            // Call the function registered by content.js.
+            if (typeof window.__sculptExtractJD === "function") {
+                return window.__sculptExtractJD();
+            }
+            return null;
+        },
+    });
+
+    const result = results?.[0]?.result;
+    if (!result || !result.text) {
+        throw new Error("No job description found on this page.");
+    }
+    return result; // { text, source }
+}
+
+async function getActiveTabId() {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    return tab?.id ?? null;
 }
