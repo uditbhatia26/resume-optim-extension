@@ -765,6 +765,51 @@ body {
     cursor: not-allowed;
 }
 
+/* ---- Job description card header (title + remove button) ---- */
+.jd-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.jd-card-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #8892b0;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+}
+
+.jd-remove-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #8892b0;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    line-height: 1;
+}
+
+.jd-remove-btn svg {
+    width: 10px;
+    height: 10px;
+    flex-shrink: 0;
+}
+
+.jd-remove-btn:hover {
+    color: #ff6b6b;
+    background: rgba(255, 107, 107, 0.1);
+    border-color: rgba(255, 107, 107, 0.25);
+}
+
 .job-input-textarea {
     width: 100%;
     background: rgba(255, 255, 255, 0.04);

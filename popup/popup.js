@@ -414,6 +414,7 @@ function initializeEventListeners() {
     document.getElementById("resumeFileInput")?.addEventListener("change", handleResumeUpload);
     document.getElementById("addJobBtn")?.addEventListener("click", handleAddJobClick);
     document.getElementById("fetchFromPageBtn")?.addEventListener("click", handleFetchFromPageClick);
+    document.getElementById("removeJobBtn")?.addEventListener("click", handleRemoveJobClick);
     document.getElementById("readMoreBtn")?.addEventListener("click", handleReadMoreClick);
     document.getElementById("analyzeBtn")?.addEventListener("click", handleAnalyzeClick);
     document.getElementById("generateBtn")?.addEventListener("click", handleGenerateClick);
@@ -692,11 +693,58 @@ async function handleAddJobClick() {
 }
 
 function displayJobDescription() {
-    const jobContainer  = document.getElementById("jobContainer");
+    const jobContainer   = document.getElementById("jobContainer");
     const jobDescription = document.getElementById("jobDescription");
     jobDescription.textContent = jobDescriptionFull.substring(0, 200) + "...";
     jobContainer.style.display = "block";
     jobContainer.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+/**
+ * Remove the loaded job description and reset all downstream state.
+ */
+async function handleRemoveJobClick() {
+    // Clear in-memory state
+    jobDescriptionFull = "";
+    isExpanded         = false;
+    _pageJDCache       = null;
+
+    // Clear persisted session
+    await chrome.storage.local.remove([
+        "session_jd",           "session_jd_cache_id",
+        "session_ats_score",    "session_optimized_score",
+        "session_improvements", "session_optimized_yaml",
+        "session_progress",     "optimization_status",
+        "optimization_error",   "analyze_status",
+        "analyze_error",
+    ]);
+
+    // Hide JD card, show input area again
+    document.getElementById("jobContainer").style.display      = "none";
+    document.querySelector(".input-section").style.display      = "block";
+    document.getElementById("jobDescriptionInput").value        = "";
+
+    // Reset score display
+    document.getElementById("originalScore").textContent = "--";
+
+    // Lock downstream buttons
+    document.getElementById("analyzeBtn").disabled  = true;
+    document.getElementById("generateBtn").disabled = true;
+    document.getElementById("previewBtn").disabled  = true;
+    document.getElementById("downloadBtn").disabled = true;
+    document.getElementById("downloadBtn").style.display = "none";
+
+    // Hide optimized results section if visible
+    const optSection = document.getElementById("optimizedScoreSection");
+    if (optSection) optSection.style.display = "none";
+
+    // Stop any running pollers
+    stopAnalyzePoller();
+    stopResultPoller();
+    TaskProgress.stop();
+
+    // Re-probe the page so the fetch bar comes back if still on a job listing
+    probePageForJD();
 }
 
 function handleReadMoreClick() {
