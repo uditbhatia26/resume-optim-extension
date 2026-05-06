@@ -315,11 +315,18 @@ document.addEventListener("DOMContentLoaded", async function () {
 });
 
 async function checkAuthStatus() {
-    const { access_token, user_email, has_resume, resume_filename } =
-        await getFromStorage(["access_token", "user_email", "has_resume", "resume_filename"]);
+    const { access_token, user_email, has_resume, resume_filename, email_verified } =
+        await getFromStorage(["access_token", "user_email", "has_resume", "resume_filename", "email_verified"]);
 
     if (access_token) {
-        currentUser = { email: user_email, has_resume: !!has_resume, resume_filename };
+        currentUser = {
+            email:          user_email,
+            has_resume:     !!has_resume,
+            resume_filename,
+            // Default to true for existing sessions that predate this field
+            // Only show the banner when the server has explicitly told us it's false
+            email_verified: email_verified ?? true,
+        };
         showMainApp();
     } else {
         showAuthScreen();
