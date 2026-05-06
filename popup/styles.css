@@ -190,10 +190,8 @@ body {
     flex-shrink: 0;
 }
 
-/* Visit Site button — hidden in header to save space */
-.landing-btn {
-    display: none;
-}
+/* Dashboard button uses .settings-btn — see below */
+.landing-btn { display: none; }
 
 .settings-btn {
     background: none;
