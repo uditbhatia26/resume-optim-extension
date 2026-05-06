@@ -190,24 +190,22 @@ function startResultPoller() {
             "optimization_status", "optimization_error",
             "session_optimized_score", "session_ats_score",
             "session_improvements",
+            "weekly_usage", "weekly_limit", "daily_usage", "monthly_usage",
         ]);
-        console.log("[POLLER] tick:", JSON.stringify({
-            status: s.optimization_status,
-            score: s.session_optimized_score,
-            ats: s.session_ats_score,
-        }));
 
         if (s.optimization_status === "done" && s.session_optimized_score != null) {
-            console.log("[POLLER] Detected DONE — calling handleOptimizeDone");
             clearInterval(_resultPollerTimer);
             _resultPollerTimer = null;
             handleOptimizeDone({
-                original_score: s.session_ats_score,
-                optimized_score: s.session_optimized_score,
+                original_score:   s.session_ats_score,
+                optimized_score:  s.session_optimized_score,
                 improvements_made: s.session_improvements || [],
+                weekly_usage:     s.weekly_usage  ?? 0,
+                weekly_limit:     s.weekly_limit  ?? 5,
+                daily_usage:      s.daily_usage   ?? 0,
+                monthly_usage:    s.monthly_usage ?? 0,
             });
         } else if (s.optimization_status === "error") {
-            console.log("[POLLER] Detected ERROR");
             clearInterval(_resultPollerTimer);
             _resultPollerTimer = null;
             handleOptimizeError(s.optimization_error || "Unknown error during optimization.");

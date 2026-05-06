@@ -138,8 +138,10 @@ async function handleOptimizeResume({ job_desc, jd_cache_id, original_ats_score 
             session_optimized_yaml: data.optimized_resume_yaml,
             session_resume_changes: data.resume_changes || [],
             session_progress: 5,
-            weekly_usage: data.weekly_usage,
-            weekly_limit: data.weekly_limit,
+            weekly_usage:  data.weekly_usage,
+            weekly_limit:  data.weekly_limit,
+            daily_usage:   data.daily_usage  ?? 0,
+            monthly_usage: data.monthly_usage ?? 0,
         });
         notifyPopup({ type: "OPTIMIZE_DONE", payload: data });
     } catch (err) {
