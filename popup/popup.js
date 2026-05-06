@@ -404,6 +404,11 @@ async function showMainApp() {
         currentUser?.weekly_limit  ?? 5,
     );
 
+    // Remind unverified users to check their inbox
+    if (currentUser && !currentUser.email_verified) {
+        showUnverifiedBanner();
+    }
+
     // Auto-probe the active tab for a job description (non-blocking)
     probePageForJD();
 }
@@ -482,19 +487,21 @@ async function handleLogin(e) {
             has_resume:     data.has_resume,
             resume_filename: null,
             plan:           data.plan,
+            email_verified: data.email_verified,
             weekly_usage:   data.weekly_usage,
             weekly_limit:   data.weekly_limit,
             daily_usage:    data.daily_usage,
             monthly_usage:  data.monthly_usage,
         });
         currentUser = {
-            email:         data.email,
-            has_resume:    data.has_resume,
+            email:          data.email,
+            has_resume:     data.has_resume,
             resume_filename: null,
-            weekly_usage:  data.weekly_usage,
-            weekly_limit:  data.weekly_limit,
-            daily_usage:   data.daily_usage,
-            monthly_usage: data.monthly_usage,
+            email_verified: data.email_verified,
+            weekly_usage:   data.weekly_usage,
+            weekly_limit:   data.weekly_limit,
+            daily_usage:    data.daily_usage,
+            monthly_usage:  data.monthly_usage,
         };
         showMainApp();
     } catch (error) {
@@ -535,21 +542,24 @@ async function handleSignup(e) {
             has_resume:     data.has_resume,
             resume_filename: null,
             plan:           data.plan,
+            email_verified: data.email_verified,
             weekly_usage:   data.weekly_usage,
             weekly_limit:   data.weekly_limit,
             daily_usage:    data.daily_usage,
             monthly_usage:  data.monthly_usage,
         });
         currentUser = {
-            email:         data.email,
-            has_resume:    data.has_resume,
+            email:          data.email,
+            has_resume:     data.has_resume,
             resume_filename: null,
-            weekly_usage:  data.weekly_usage,
-            weekly_limit:  data.weekly_limit,
-            daily_usage:   data.daily_usage,
-            monthly_usage: data.monthly_usage,
+            email_verified: data.email_verified,
+            weekly_usage:   data.weekly_usage,
+            weekly_limit:   data.weekly_limit,
+            daily_usage:    data.daily_usage,
+            monthly_usage:  data.monthly_usage,
         };
-        showMainApp();
+        // Show verification-pending screen instead of main app
+        showVerificationPendingScreen(data.email);
     } catch (error) {
         errorEl.textContent = apiErrorMessage(error, "Signup failed. Please try again.");
         btn.disabled    = false;
@@ -1299,4 +1309,117 @@ function handleChangelogToggle() {
     const isOpen = body.style.display !== "none";
     body.style.display = isOpen ? "none" : "block";
     toggle.classList.toggle("open", !isOpen);
+}
+
+
+// ============================
+// Email Verification UI
+// ============================
+
+/**
+ * Replace the auth screen with a "Check your inbox" panel.
+ * Shown immediately after signup.
+ */
+function showVerificationPendingScreen(email) {
+    const authScreen = document.getElementById("authScreen");
+    if (!authScreen) return;
+
+    authScreen.style.display = "block";
+    document.getElementById("mainApp").style.display = "none";
+
+    authScreen.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+                  height:100%;padding:32px 24px;text-align:center;gap:16px;">
+        <div style="font-size:48px;">📬</div>
+        <h2 style="color:#e2e8f0;margin:0;font-size:18px;font-weight:700;">
+          Check your inbox
+        </h2>
+        <p style="color:#94a3b8;margin:0;line-height:1.6;font-size:13px;max-width:280px;">
+          We've sent a verification link to<br>
+          <strong style="color:#a78bfa;">${email}</strong>.<br><br>
+          Click the link in the email to activate your account, then come back and sign in.
+        </p>
+        <button id="resendVerifyBtn"
+                style="background:transparent;border:1px solid #6c63ff;color:#a78bfa;
+                       border-radius:8px;padding:10px 24px;cursor:pointer;font-size:13px;
+                       margin-top:8px;">
+          Resend Email
+        </button>
+        <button id="backToLoginBtn"
+                style="background:transparent;border:none;color:#64748b;
+                       cursor:pointer;font-size:12px;text-decoration:underline;">
+          Back to Sign In
+        </button>
+      </div>`;
+
+    document.getElementById("resendVerifyBtn")?.addEventListener("click", handleResendVerification);
+    document.getElementById("backToLoginBtn")?.addEventListener("click", () => {
+        // Clear the pending state and show the normal auth screen
+        chrome.storage.local.clear();
+        currentUser = null;
+        location.reload();
+    });
+}
+
+/**
+ * Show a dismissible banner at the top of the main app for logged-in
+ * but unverified users.
+ */
+function showUnverifiedBanner() {
+    if (document.getElementById("unverifiedBanner")) return; // already shown
+
+    const banner = document.createElement("div");
+    banner.id = "unverifiedBanner";
+    banner.style.cssText = `
+        background: linear-gradient(135deg, rgba(234,179,8,0.15), rgba(234,179,8,0.05));
+        border: 1px solid rgba(234,179,8,0.3);
+        border-radius: 8px;
+        padding: 10px 14px;
+        margin: 0 0 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        font-size: 12px;
+        color: #fbbf24;
+    `;
+    banner.innerHTML = `
+        <span>⚠️ Please verify your email to use all features.
+          <button id="resendVerifyBannerBtn"
+                  style="background:transparent;border:none;color:#a78bfa;
+                         cursor:pointer;font-size:12px;text-decoration:underline;padding:0;">
+            Resend
+          </button>
+        </span>`;
+
+    const mainApp = document.getElementById("mainApp");
+    if (mainApp) mainApp.prepend(banner);
+
+    document.getElementById("resendVerifyBannerBtn")
+        ?.addEventListener("click", handleResendVerification);
+}
+
+/** Call /auth/resend-verification and show feedback. */
+async function handleResendVerification() {
+    const btn = document.getElementById("resendVerifyBtn") ||
+                document.getElementById("resendVerifyBannerBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "Sending…"; }
+
+    try {
+        const { access_token } = await getFromStorage(["access_token"]);
+        const res = await fetch(`${API_BASE}/auth/resend-verification`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${access_token}` },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            alert(data.detail || "Could not resend email. Please try again.");
+        } else {
+            alert("✅ Verification email sent! Check your inbox.");
+        }
+    } catch {
+        alert("Network error. Please try again.");
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = btn.id === "resendVerifyBtn" ? "Resend Email" : "Resend"; }
+    }
 }
