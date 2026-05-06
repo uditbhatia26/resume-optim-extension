@@ -805,7 +805,8 @@ function handleUploadError(msg) {
 // Event Handlers
 // ============================
 function handleLandingClick() {
-    window.open("https://resumesculpt.com", "_blank");
+    // Opens the web dashboard — update this URL when app.resumesculpt.com goes live
+    chrome.tabs.create({ url: "https://app.resumesculpt.com" });
 }
 
 function handleJobDescriptionInputChange() {
