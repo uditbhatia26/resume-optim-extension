@@ -341,6 +341,9 @@ async function checkAuthStatus() {
     };
     showMainApp();
 
+    // Silently refresh the token if it expires within 24 hours
+    tryRefreshToken(access_token);
+
     // If storage says unverified, silently re-check the DB.
     // The user may have clicked the verification link since last popup open.
     if (email_verified === false) {
@@ -363,6 +366,63 @@ async function checkAuthStatus() {
         }
     }
 }
+
+/**
+ * Decode a JWT payload (no signature verification — read-only).
+ * Returns the exp timestamp in seconds, or null if unreadable.
+ */
+function getTokenExpiry(token) {
+    try {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        return payload.exp ?? null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * If the token expires within 24 hours, silently call /auth/refresh
+ * and store the new token so the user never sees a re-login screen.
+ */
+async function tryRefreshToken(currentToken) {
+    const exp = getTokenExpiry(currentToken);
+    if (!exp) return;
+
+    const secondsLeft = exp - Math.floor(Date.now() / 1000);
+    const oneDayInSeconds = 60 * 60 * 24;
+    if (secondsLeft > oneDayInSeconds) return; // plenty of time left
+
+    try {
+        const res = await fetch(`${API_BASE}/auth/refresh`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${currentToken}` },
+        });
+        if (!res.ok) return; // expired — user will be logged out on next API call
+        const data = await res.json();
+        await setToStorage({
+            access_token:  data.access_token,
+            user_email:    data.email,
+            plan:          data.plan,
+            has_resume:    data.has_resume,
+            resume_filename: data.resume_filename,
+            email_verified: data.email_verified,
+            weekly_usage:  data.weekly_usage,
+            weekly_limit:  data.weekly_limit,
+            daily_usage:   data.daily_usage,
+            monthly_usage: data.monthly_usage,
+        });
+        // Update in-memory currentUser with refreshed data
+        currentUser.plan           = data.plan;
+        currentUser.weekly_usage   = data.weekly_usage;
+        currentUser.weekly_limit   = data.weekly_limit;
+        currentUser.daily_usage    = data.daily_usage;
+        currentUser.monthly_usage  = data.monthly_usage;
+        currentUser.email_verified = data.email_verified;
+    } catch {
+        // Network error — ignore, current token still works until expiry
+    }
+}
+
 
 
 /** Listen for push notifications from the background worker. */
