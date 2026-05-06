@@ -627,12 +627,7 @@ async function handleGoogleLogin() {
     const manifest  = chrome.runtime.getManifest();
     const clientId  = manifest.oauth2?.client_id;
     if (!clientId || clientId.startsWith("YOUR_")) {
-        alert(
-            "Google sign-in is not configured yet.\n\n" +
-            "Please:\n" +
-            "1. Create a Chrome Extension OAuth client at console.cloud.google.com\n" +
-            "2. Paste your Client ID into manifest.json → oauth2.client_id"
-        );
+        showAuthError("Google sign-in is not configured yet. Contact support.");
         return;
     }
 
@@ -823,9 +818,9 @@ async function handleAddJobClick() {
     const textarea = document.getElementById("jobDescriptionInput");
     const inputText = textarea.value.trim();
 
-    if (!inputText) { alert("Please paste a job description first"); return; }
+    if (!inputText) { showAuthError("Please paste a job description first."); return; }
     if (inputText.length < 50) {
-        alert("Job description seems too short. Please provide a more detailed one.");
+        showAuthError("Job description is too short. Please paste the full job posting.");
         return;
     }
 
@@ -1092,7 +1087,7 @@ function handleOptimizeError(errMsg) {
 }
 
 async function handlePreviewClick() {
-    alert("Preview feature coming soon!");
+    showToast("Preview feature coming soon! 🚀", "info");
 }
 
 async function handleDownloadClick() {
@@ -1149,7 +1144,7 @@ async function handleDownloadClick() {
 
 async function handleRecalculateClick() {
     if (!jobDescriptionFull) {
-        alert("No job description loaded.");
+        showError("No job description loaded. Please add one first.");
         return;
     }
     await handleAnalyzeClick();
@@ -1205,13 +1200,66 @@ function setGenerateButtonRunning(running) {
 }
 
 function showError(msg) {
-    // Reuse the upload error slot or fall back to alert
-    const el = document.getElementById("uploadError2") || document.getElementById("uploadError");
-    if (el) {
-        el.textContent = msg;
-        el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    // Try main app error slot first, then auth form error, then toast
+    const mainEl = document.getElementById("uploadError2") || document.getElementById("uploadError");
+    if (mainEl && document.getElementById("mainApp")?.style.display !== "none") {
+        mainEl.textContent = msg;
+        mainEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
     } else {
-        alert(msg);
+        showAuthError(msg);
+    }
+}
+
+/** Show a temporary toast notification at the top of the popup. */
+function showToast(msg, type = "success") {
+    const existing = document.getElementById("sculpt-toast");
+    if (existing) existing.remove();
+
+    const toast = document.createElement("div");
+    toast.id = "sculpt-toast";
+    toast.textContent = msg;
+    const colors = {
+        success: "#22c55e",
+        error:   "#ef4444",
+        info:    "#8A2BE2",
+    };
+    Object.assign(toast.style, {
+        position:     "fixed",
+        top:          "12px",
+        left:         "50%",
+        transform:    "translateX(-50%)",
+        background:   colors[type] || colors.info,
+        color:        "#fff",
+        padding:      "10px 18px",
+        borderRadius: "10px",
+        fontSize:     "13px",
+        fontWeight:   "600",
+        zIndex:       "9999",
+        boxShadow:    "0 4px 20px rgba(0,0,0,0.3)",
+        maxWidth:     "320px",
+        textAlign:    "center",
+        animation:    "fadeSlideIn 0.25s ease",
+        whiteSpace:   "pre-wrap",
+    });
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3500);
+}
+
+/** Show an error on the auth screen (uses whichever error div is visible). */
+function showAuthError(msg) {
+    // Pick the visible form's error div
+    const loginForm  = document.getElementById("loginForm");
+    const signupForm = document.getElementById("signupForm");
+    const isSignup   = signupForm && signupForm.style.display !== "none";
+    const errEl      = isSignup
+        ? document.getElementById("signupError")
+        : document.getElementById("loginError");
+
+    if (errEl) {
+        errEl.textContent = msg;
+        errEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    } else {
+        showToast(msg, "error");
     }
 }
 
@@ -1551,12 +1599,12 @@ async function handleResendVerification() {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-            alert(data.detail || "Could not resend email. Please try again.");
+            showToast(data.detail || "Could not resend email. Please try again.", "error");
         } else {
-            alert("✅ Verification email sent! Check your inbox.");
+            showToast("✅ Verification email sent! Check your inbox.", "success");
         }
     } catch {
-        alert("Network error. Please try again.");
+        showToast("Network error. Please try again.", "error");
     } finally {
         if (btn) { btn.disabled = false; btn.textContent = btn.id === "resendVerifyBtn" ? "Resend Email" : "Resend"; }
     }
