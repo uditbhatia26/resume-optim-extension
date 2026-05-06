@@ -315,17 +315,27 @@ document.addEventListener("DOMContentLoaded", async function () {
 });
 
 async function checkAuthStatus() {
-    const { access_token, user_email, has_resume, resume_filename, email_verified } =
-        await getFromStorage(["access_token", "user_email", "has_resume", "resume_filename", "email_verified"]);
+    const {
+        access_token, user_email, has_resume, resume_filename,
+        email_verified,
+        weekly_usage, weekly_limit, daily_usage, monthly_usage, plan,
+    } = await getFromStorage([
+        "access_token", "user_email", "has_resume", "resume_filename",
+        "email_verified",
+        "weekly_usage", "weekly_limit", "daily_usage", "monthly_usage", "plan",
+    ]);
 
     if (access_token) {
         currentUser = {
             email:          user_email,
             has_resume:     !!has_resume,
             resume_filename,
-            // Default to true for existing sessions that predate this field
-            // Only show the banner when the server has explicitly told us it's false
             email_verified: email_verified ?? true,
+            plan:           plan ?? "free",
+            weekly_usage:   weekly_usage  ?? 0,
+            weekly_limit:   weekly_limit  ?? 5,
+            daily_usage:    daily_usage   ?? 0,
+            monthly_usage:  monthly_usage ?? 0,
         };
         showMainApp();
     } else {
