@@ -7,8 +7,14 @@
         "storage",
         "activeTab",
         "scripting",
-        "tabs"
+        "tabs",
+        "identity"
     ],
+    "oauth2": {
+        "client_id": "551941315184-9mf9khph2hkv1v7k89m0ngidh83nh2v7.apps.googleusercontent.com",
+        "scopes": ["openid", "email", "profile"]
+    },
+
     "content_scripts": [
         {
             "matches": ["<all_urls>"],
@@ -18,7 +24,9 @@
     ],
     "host_permissions": [
         "http://localhost:8000/*",
-        "https://your-domain.com/*"
+        "https://your-domain.com/*",
+        "https://accounts.google.com/*",
+        "https://www.googleapis.com/*"
     ],
     "background": {
         "service_worker": "background.js"
