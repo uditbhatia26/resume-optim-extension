@@ -71,7 +71,7 @@ async function restoreSession() {
         "session_improvements", "session_progress",
         "session_optimized_yaml", "optimization_status", "optimization_error",
         "analyze_status", "analyze_error",
-        "upload_status",  "upload_error",  "upload_filename",
+        "upload_status", "upload_error", "upload_filename",
         "session_resume_changes",
         "daily_usage", "monthly_usage", "weekly_usage", "weekly_limit",
     ]);
@@ -115,10 +115,10 @@ async function restoreSession() {
     // ---- Restore optimization state ----
     if (s.optimization_status === "done" && s.session_optimized_score != null) {
         handleOptimizeDone({
-            original_score:    s.session_ats_score  ?? 0,
-            optimized_score:   s.session_optimized_score,
+            original_score: s.session_ats_score ?? 0,
+            optimized_score: s.session_optimized_score,
             improvements_made: s.session_improvements || [],
-            resume_changes:    s.session_resume_changes || [],
+            resume_changes: s.session_resume_changes || [],
         });
     } else if (s.optimization_status === "running") {
         setGenerateButtonRunning(true);
@@ -137,8 +137,8 @@ async function restoreSession() {
 }
 
 
-let _resultPollerTimer  = null;
-let _uploadPollerTimer  = null;
+let _resultPollerTimer = null;
+let _uploadPollerTimer = null;
 let _analyzePollerTimer = null;
 
 /** Poll until upload completes or errors. */
@@ -202,8 +202,8 @@ function startResultPoller() {
             clearInterval(_resultPollerTimer);
             _resultPollerTimer = null;
             handleOptimizeDone({
-                original_score:   s.session_ats_score,
-                optimized_score:  s.session_optimized_score,
+                original_score: s.session_ats_score,
+                optimized_score: s.session_optimized_score,
                 improvements_made: s.session_improvements || [],
             });
         } else if (s.optimization_status === "error") {
@@ -230,10 +230,10 @@ async function clearSession() {
 // Task Progress Bar
 // ============================
 const TaskProgress = {
-    _timer:    null,
-    _start:    0,
+    _timer: null,
+    _start: 0,
     _duration: 0,
-    _pct:      0,
+    _pct: 0,
 
     /**
      * Start the progress bar.
@@ -242,31 +242,31 @@ const TaskProgress = {
      */
     start(label, durationMs) {
         this.stop();
-        this._start    = Date.now();
+        this._start = Date.now();
         this._duration = durationMs;
-        this._pct      = 0;
+        this._pct = 0;
 
-        const wrap  = document.getElementById("taskProgressWrap");
-        const bar   = document.getElementById("taskProgressBar");
+        const wrap = document.getElementById("taskProgressWrap");
+        const bar = document.getElementById("taskProgressBar");
         const pctEl = document.getElementById("taskProgressPct");
-        const lbl   = document.getElementById("taskProgressLabel");
-        const eta   = document.getElementById("taskProgressEta");
+        const lbl = document.getElementById("taskProgressLabel");
+        const eta = document.getElementById("taskProgressEta");
 
         if (!wrap) return;
-        wrap.style.display  = "block";
-        lbl.textContent     = label;
-        bar.style.width     = "0%";
-        pctEl.textContent   = "0%";
-        eta.textContent     = "";
+        wrap.style.display = "block";
+        lbl.textContent = label;
+        bar.style.width = "0%";
+        pctEl.textContent = "0%";
+        eta.textContent = "";
 
         this._timer = setInterval(() => {
-            const elapsed  = Date.now() - this._start;
-            const ratio    = Math.min(elapsed / this._duration, 1);
+            const elapsed = Date.now() - this._start;
+            const ratio = Math.min(elapsed / this._duration, 1);
             // Ease-out: fast start, slow near the end — caps at 90%
-            const eased    = (1 - Math.pow(1 - ratio, 3)) * 90;
-            this._pct      = Math.round(eased);
+            const eased = (1 - Math.pow(1 - ratio, 3)) * 90;
+            this._pct = Math.round(eased);
 
-            bar.style.width   = `${this._pct}%`;
+            bar.style.width = `${this._pct}%`;
             pctEl.textContent = `${this._pct}%`;
 
             const remaining = Math.max(0, Math.round((this._duration - elapsed) / 1000));
@@ -279,19 +279,19 @@ const TaskProgress = {
         clearInterval(this._timer);
         this._timer = null;
 
-        const bar   = document.getElementById("taskProgressBar");
+        const bar = document.getElementById("taskProgressBar");
         const pctEl = document.getElementById("taskProgressPct");
-        const eta   = document.getElementById("taskProgressEta");
-        const wrap  = document.getElementById("taskProgressWrap");
+        const eta = document.getElementById("taskProgressEta");
+        const wrap = document.getElementById("taskProgressWrap");
 
         if (!bar) return;
-        bar.style.width   = "100%";
+        bar.style.width = "100%";
         pctEl.textContent = "100%";
         if (eta) eta.textContent = "Done!";
 
         setTimeout(() => {
             if (wrap) wrap.style.display = "none";
-            if (bar)  bar.style.width    = "0%";
+            if (bar) bar.style.width = "0%";
         }, 900);
     },
 
@@ -325,23 +325,47 @@ async function checkAuthStatus() {
         "weekly_usage", "weekly_limit", "daily_usage", "monthly_usage", "plan",
     ]);
 
-    if (access_token) {
-        currentUser = {
-            email:          user_email,
-            has_resume:     !!has_resume,
-            resume_filename,
-            email_verified: email_verified ?? true,
-            plan:           plan ?? "free",
-            weekly_usage:   weekly_usage  ?? 0,
-            weekly_limit:   weekly_limit  ?? 5,
-            daily_usage:    daily_usage   ?? 0,
-            monthly_usage:  monthly_usage ?? 0,
-        };
-        showMainApp();
-    } else {
+    if (!access_token) {
         showAuthScreen();
+        return;
+    }
+
+    currentUser = {
+        email:          user_email,
+        has_resume:     !!has_resume,
+        resume_filename,
+        email_verified: email_verified ?? true,
+        plan:           plan ?? "free",
+        weekly_usage:   weekly_usage  ?? 0,
+        weekly_limit:   weekly_limit  ?? 5,
+        daily_usage:    daily_usage   ?? 0,
+        monthly_usage:  monthly_usage ?? 0,
+    };
+    showMainApp();
+
+    // If storage says unverified, silently re-check the DB.
+    // The user may have clicked the verification link since last popup open.
+    if (email_verified === false) {
+        try {
+            const res = await fetch(`${API_BASE}/auth/me`, {
+                headers: { "Authorization": `Bearer ${access_token}` },
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.email_verified) {
+                    // DB says verified now — update storage and refresh UI
+                    currentUser.email_verified = true;
+                    await setToStorage({ email_verified: true });
+                    const banner = document.getElementById("unverifiedBanner");
+                    if (banner) banner.remove();
+                }
+            }
+        } catch {
+            // Network error — ignore, banner stays until next successful check
+        }
     }
 }
+
 
 /** Listen for push notifications from the background worker. */
 function listenToBackground() {
@@ -415,10 +439,10 @@ async function showMainApp() {
 
     // Show usage meter from stored auth data
     updateUsageMeter(
-        currentUser?.daily_usage   ?? 0,
+        currentUser?.daily_usage ?? 0,
         currentUser?.monthly_usage ?? 0,
-        currentUser?.weekly_usage  ?? 0,
-        currentUser?.weekly_limit  ?? 5,
+        currentUser?.weekly_usage ?? 0,
+        currentUser?.weekly_limit ?? 5,
     );
 
     // Remind unverified users to check their inbox
@@ -431,17 +455,17 @@ async function showMainApp() {
 }
 
 function initializeEventListeners() {
-    const loginBtn      = document.getElementById("loginBtn");
-    const signupBtn     = document.getElementById("signupBtn");
-    const logoutBtn     = document.getElementById("logoutBtn");
+    const loginBtn = document.getElementById("loginBtn");
+    const signupBtn = document.getElementById("signupBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
     const showSignupLink = document.getElementById("showSignup");
-    const showLoginLink  = document.getElementById("showLogin");
+    const showLoginLink = document.getElementById("showLogin");
 
-    if (loginBtn)       loginBtn.addEventListener("click", handleLogin);
-    if (signupBtn)      signupBtn.addEventListener("click", handleSignup);
-    if (logoutBtn)      logoutBtn.addEventListener("click", handleLogout);
+    if (loginBtn) loginBtn.addEventListener("click", handleLogin);
+    if (signupBtn) signupBtn.addEventListener("click", handleSignup);
+    if (logoutBtn) logoutBtn.addEventListener("click", handleLogout);
     if (showSignupLink) showSignupLink.addEventListener("click", () => toggleAuthForm("signup"));
-    if (showLoginLink)  showLoginLink.addEventListener("click", () => toggleAuthForm("login"));
+    if (showLoginLink) showLoginLink.addEventListener("click", () => toggleAuthForm("login"));
 
     document.getElementById("landingBtn")?.addEventListener("click", handleLandingClick);
     document.getElementById("resumeFileInput")?.addEventListener("change", handleResumeUpload);
@@ -464,29 +488,29 @@ function initializeEventListeners() {
 // Authentication Handlers
 // ============================
 function toggleAuthForm(form) {
-    const loginForm  = document.getElementById("loginForm");
+    const loginForm = document.getElementById("loginForm");
     const signupForm = document.getElementById("signupForm");
     if (form === "signup") {
-        loginForm.style.display  = "none";
+        loginForm.style.display = "none";
         signupForm.style.display = "block";
     } else {
         signupForm.style.display = "none";
-        loginForm.style.display  = "block";
+        loginForm.style.display = "block";
     }
 }
 
 async function handleLogin(e) {
     e.preventDefault();
-    const email     = document.getElementById("loginEmail").value.trim();
-    const password  = document.getElementById("loginPassword").value;
-    const errorEl   = document.getElementById("loginError");
-    const btn       = document.getElementById("loginBtn");
+    const email = document.getElementById("loginEmail").value.trim();
+    const password = document.getElementById("loginPassword").value;
+    const errorEl = document.getElementById("loginError");
+    const btn = document.getElementById("loginBtn");
 
     if (!email || !password) { errorEl.textContent = "Please fill in all fields"; return; }
 
     errorEl.textContent = "";
-    btn.disabled     = true;
-    btn.textContent  = "Signing in…";
+    btn.disabled = true;
+    btn.textContent = "Signing in…";
 
     try {
         const res = await fetch(`${API_BASE}/auth/login`, {
@@ -498,49 +522,49 @@ async function handleLogin(e) {
         if (!res.ok) throw data;
 
         await setToStorage({
-            access_token:   data.access_token,
-            user_email:     data.email,
-            user_id:        data.user_id,
-            has_resume:     data.has_resume,
+            access_token: data.access_token,
+            user_email: data.email,
+            user_id: data.user_id,
+            has_resume: data.has_resume,
             resume_filename: null,
-            plan:           data.plan,
+            plan: data.plan,
             email_verified: data.email_verified,
-            weekly_usage:   data.weekly_usage,
-            weekly_limit:   data.weekly_limit,
-            daily_usage:    data.daily_usage,
-            monthly_usage:  data.monthly_usage,
+            weekly_usage: data.weekly_usage,
+            weekly_limit: data.weekly_limit,
+            daily_usage: data.daily_usage,
+            monthly_usage: data.monthly_usage,
         });
         currentUser = {
-            email:          data.email,
-            has_resume:     data.has_resume,
+            email: data.email,
+            has_resume: data.has_resume,
             resume_filename: null,
             email_verified: data.email_verified,
-            weekly_usage:   data.weekly_usage,
-            weekly_limit:   data.weekly_limit,
-            daily_usage:    data.daily_usage,
-            monthly_usage:  data.monthly_usage,
+            weekly_usage: data.weekly_usage,
+            weekly_limit: data.weekly_limit,
+            daily_usage: data.daily_usage,
+            monthly_usage: data.monthly_usage,
         };
         showMainApp();
     } catch (error) {
         errorEl.textContent = apiErrorMessage(error, "Login failed. Please try again.");
-        btn.disabled    = false;
+        btn.disabled = false;
         btn.textContent = "Sign In";
     }
 }
 
 async function handleSignup(e) {
     e.preventDefault();
-    const email    = document.getElementById("signupEmail").value.trim();
+    const email = document.getElementById("signupEmail").value.trim();
     const password = document.getElementById("signupPassword").value;
     const fullName = document.getElementById("signupName").value.trim();
-    const errorEl  = document.getElementById("signupError");
-    const btn      = document.getElementById("signupBtn");
+    const errorEl = document.getElementById("signupError");
+    const btn = document.getElementById("signupBtn");
 
     if (!email || !password) { errorEl.textContent = "Email and password are required"; return; }
-    if (password.length < 6)  { errorEl.textContent = "Password must be at least 6 characters"; return; }
+    if (password.length < 6) { errorEl.textContent = "Password must be at least 6 characters"; return; }
 
     errorEl.textContent = "";
-    btn.disabled    = true;
+    btn.disabled = true;
     btn.textContent = "Creating account…";
 
     try {
@@ -553,33 +577,33 @@ async function handleSignup(e) {
         if (!res.ok) throw data;
 
         await setToStorage({
-            access_token:   data.access_token,
-            user_email:     data.email,
-            user_id:        data.user_id,
-            has_resume:     data.has_resume,
+            access_token: data.access_token,
+            user_email: data.email,
+            user_id: data.user_id,
+            has_resume: data.has_resume,
             resume_filename: null,
-            plan:           data.plan,
+            plan: data.plan,
             email_verified: data.email_verified,
-            weekly_usage:   data.weekly_usage,
-            weekly_limit:   data.weekly_limit,
-            daily_usage:    data.daily_usage,
-            monthly_usage:  data.monthly_usage,
+            weekly_usage: data.weekly_usage,
+            weekly_limit: data.weekly_limit,
+            daily_usage: data.daily_usage,
+            monthly_usage: data.monthly_usage,
         });
         currentUser = {
-            email:          data.email,
-            has_resume:     data.has_resume,
+            email: data.email,
+            has_resume: data.has_resume,
             resume_filename: null,
             email_verified: data.email_verified,
-            weekly_usage:   data.weekly_usage,
-            weekly_limit:   data.weekly_limit,
-            daily_usage:    data.daily_usage,
-            monthly_usage:  data.monthly_usage,
+            weekly_usage: data.weekly_usage,
+            weekly_limit: data.weekly_limit,
+            daily_usage: data.daily_usage,
+            monthly_usage: data.monthly_usage,
         };
         // Show verification-pending screen instead of main app
         showVerificationPendingScreen(data.email);
     } catch (error) {
         errorEl.textContent = apiErrorMessage(error, "Signup failed. Please try again.");
-        btn.disabled    = false;
+        btn.disabled = false;
         btn.textContent = "Create Account";
     }
 }
@@ -595,16 +619,16 @@ async function handleLogout() {
 // Resume Upload
 // ============================
 function updateResumeUI(hasResume, filename) {
-    const noState  = document.getElementById("noResumeState");
+    const noState = document.getElementById("noResumeState");
     const hasState = document.getElementById("hasResumeState");
-    const nameEl   = document.getElementById("resumeFilenameText");
+    const nameEl = document.getElementById("resumeFilenameText");
 
     if (hasResume) {
-        noState.style.display  = "none";
+        noState.style.display = "none";
         hasState.style.display = "block";
         if (nameEl) nameEl.textContent = filename || "resume.pdf";
     } else {
-        noState.style.display  = "block";
+        noState.style.display = "block";
         hasState.style.display = "none";
     }
 }
@@ -614,7 +638,7 @@ async function handleResumeUpload(e) {
     if (!file) return;
     e.target.value = "";
 
-    const errorEl  = document.getElementById("uploadError");
+    const errorEl = document.getElementById("uploadError");
     const errorEl2 = document.getElementById("uploadError2");
     [errorEl, errorEl2].forEach((el) => { if (el) el.textContent = ""; });
 
@@ -640,9 +664,9 @@ async function handleResumeUpload(e) {
     const reader = new FileReader();
     reader.onload = async function (evt) {
         // btoa loop avoids call-stack overflow on large files
-        const buf    = evt.target.result;
-        const bytes  = new Uint8Array(buf);
-        let binary   = "";
+        const buf = evt.target.result;
+        const bytes = new Uint8Array(buf);
+        let binary = "";
         for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
         const base64 = btoa(binary);
 
@@ -669,7 +693,7 @@ function showUploadingState(on, filename) {
             '<svg class="icon" viewBox="0 0 24 24" fill="currentColor" style="animation:pulse 1s infinite"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>' +
             (filename ? `Uploading ${filename}…` : "Uploading…");
     } else if (label._originalHTML) {
-        label.innerHTML    = label._originalHTML;
+        label.innerHTML = label._originalHTML;
         label._originalHTML = null;
     }
 }
@@ -682,14 +706,14 @@ function showUploadError(msg) {
 
 function handleUploadDone(filename) {
     showUploadingState(false);
-    setToStorage({ upload_status: null }).catch(() => {});
+    setToStorage({ upload_status: null }).catch(() => { });
     currentUser = { ...currentUser, has_resume: true, resume_filename: filename };
     updateResumeUI(true, filename);
 }
 
 function handleUploadError(msg) {
     showUploadError(apiErrorMessage({ detail: msg }, "Upload failed. Please try again."));
-    setToStorage({ upload_status: null }).catch(() => {});
+    setToStorage({ upload_status: null }).catch(() => { });
 }
 
 
@@ -707,7 +731,7 @@ function handleJobDescriptionInputChange() {
 }
 
 async function handleAddJobClick() {
-    const textarea  = document.getElementById("jobDescriptionInput");
+    const textarea = document.getElementById("jobDescriptionInput");
     const inputText = textarea.value.trim();
 
     if (!inputText) { alert("Please paste a job description first"); return; }
@@ -722,15 +746,15 @@ async function handleAddJobClick() {
 
     // Clear any stale optimization state from a previous JD
     await saveSession({
-        session_jd:             inputText,
-        session_jd_cache_id:    null,
-        session_ats_score:      null,
+        session_jd: inputText,
+        session_jd_cache_id: null,
+        session_ats_score: null,
         session_optimized_score: null,
-        session_improvements:   null,
+        session_improvements: null,
         session_optimized_yaml: null,
-        optimization_status:    null,
-        optimization_error:     null,
-        session_progress:       1,
+        optimization_status: null,
+        optimization_error: null,
+        session_progress: 1,
     });
 
     document.getElementById("analyzeBtn").disabled = false;
@@ -752,7 +776,7 @@ async function handleAddJobClick() {
 }
 
 function displayJobDescription() {
-    const jobContainer   = document.getElementById("jobContainer");
+    const jobContainer = document.getElementById("jobContainer");
     const jobDescription = document.getElementById("jobDescription");
     jobDescription.textContent = jobDescriptionFull.substring(0, 200) + "...";
     jobContainer.style.display = "block";
@@ -765,31 +789,31 @@ function displayJobDescription() {
 async function handleRemoveJobClick() {
     // Clear in-memory state
     jobDescriptionFull = "";
-    isExpanded         = false;
-    _pageJDCache       = null;
+    isExpanded = false;
+    _pageJDCache = null;
 
     // Clear persisted session
     await chrome.storage.local.remove([
-        "session_jd",           "session_jd_cache_id",
-        "session_ats_score",    "session_optimized_score",
+        "session_jd", "session_jd_cache_id",
+        "session_ats_score", "session_optimized_score",
         "session_improvements", "session_optimized_yaml",
-        "session_progress",     "optimization_status",
-        "optimization_error",   "analyze_status",
+        "session_progress", "optimization_status",
+        "optimization_error", "analyze_status",
         "analyze_error",
     ]);
 
     // Hide JD card, show input area again
-    document.getElementById("jobContainer").style.display      = "none";
-    document.querySelector(".input-section").style.display      = "block";
-    document.getElementById("jobDescriptionInput").value        = "";
+    document.getElementById("jobContainer").style.display = "none";
+    document.querySelector(".input-section").style.display = "block";
+    document.getElementById("jobDescriptionInput").value = "";
 
     // Reset score display
     document.getElementById("originalScore").textContent = "--";
 
     // Lock downstream buttons
-    document.getElementById("analyzeBtn").disabled  = true;
+    document.getElementById("analyzeBtn").disabled = true;
     document.getElementById("generateBtn").disabled = true;
-    document.getElementById("previewBtn").disabled  = true;
+    document.getElementById("previewBtn").disabled = true;
     document.getElementById("downloadBtn").disabled = true;
     document.getElementById("downloadBtn").style.display = "none";
 
@@ -808,20 +832,20 @@ async function handleRemoveJobClick() {
 
 function handleReadMoreClick() {
     const jobDescription = document.getElementById("jobDescription");
-    const readMoreBtn    = document.getElementById("readMoreBtn");
-    const fadeOverlay    = document.getElementById("fadeOverlay");
+    const readMoreBtn = document.getElementById("readMoreBtn");
+    const fadeOverlay = document.getElementById("fadeOverlay");
 
     if (!isExpanded) {
         jobDescription.textContent = jobDescriptionFull;
         jobDescription.classList.add("expanded");
-        readMoreBtn.textContent    = "Show Less";
-        fadeOverlay.style.display  = "none";
+        readMoreBtn.textContent = "Show Less";
+        fadeOverlay.style.display = "none";
         isExpanded = true;
     } else {
         jobDescription.textContent = jobDescriptionFull.substring(0, 200) + "...";
         jobDescription.classList.remove("expanded");
-        readMoreBtn.textContent    = "Show Full Description";
-        fadeOverlay.style.display  = "block";
+        readMoreBtn.textContent = "Show Full Description";
+        fadeOverlay.style.display = "block";
         isExpanded = false;
     }
 }
@@ -847,7 +871,7 @@ async function handleAnalyzeClick() {
     chrome.runtime.sendMessage({
         type: "ANALYZE_ATS",
         payload: {
-            job_desc:    jobDescriptionFull,
+            job_desc: jobDescriptionFull,
             jd_cache_id: session_jd_cache_id || null,
         },
     });
@@ -867,7 +891,7 @@ function handleAnalyzeDone(atsScore) {
     document.getElementById("originalScore").textContent = `${Math.round(atsScore)}%`;
     updateProgress(2);
     document.getElementById("generateBtn").disabled = false;
-    saveSession({ session_ats_score: atsScore, session_progress: 2, analyze_status: "done" }).catch(() => {});
+    saveSession({ session_ats_score: atsScore, session_progress: 2, analyze_status: "done" }).catch(() => { });
     setTimeout(() => {
         document.getElementById("originalScore")?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 100);
@@ -903,9 +927,9 @@ async function handleGenerateClick() {
     chrome.runtime.sendMessage({
         type: "OPTIMIZE_RESUME",
         payload: {
-            job_desc:           jobDescriptionFull,
-            jd_cache_id:        session_jd_cache_id || null,
-            original_ats_score: session_ats_score   || null,
+            job_desc: jobDescriptionFull,
+            jd_cache_id: session_jd_cache_id || null,
+            original_ats_score: session_ats_score || null,
         },
     });
 
@@ -920,13 +944,13 @@ function handleOptimizeDone(data) {
     TaskProgress.done();
     setGenerateButtonRunning(false);
 
-    const origScore = data.original_score  ?? data.originalScore  ?? 0;
-    const optScore  = data.optimized_score ?? data.optimizedScore ?? 0;
+    const origScore = data.original_score ?? data.originalScore ?? 0;
+    const optScore = data.optimized_score ?? data.optimizedScore ?? 0;
     const improvements = data.improvements_made || data.improvements || [];
-    const changes      = data.resume_changes || [];
+    const changes = data.resume_changes || [];
 
     showOptimizedScoreSection({
-        originalScore:  origScore,
+        originalScore: origScore,
         optimizedScore: optScore,
         improvements,
     });
@@ -936,24 +960,24 @@ function handleOptimizeDone(data) {
 
     // Update usage meter with fresh counts from the optimize response
     updateUsageMeter(
-        data.daily_usage   ?? 0,
+        data.daily_usage ?? 0,
         data.monthly_usage ?? 0,
-        data.weekly_usage  ?? 0,
-        data.weekly_limit  ?? 5,
+        data.weekly_usage ?? 0,
+        data.weekly_limit ?? 5,
     );
 
     // Persist so the safety-net in restoreSession also finds YAML
     saveSession({
-        optimization_status:     "done",
+        optimization_status: "done",
         session_optimized_score: optScore,
-        session_improvements:    improvements,
-        session_resume_changes:  changes,
-    }).catch(() => {});
+        session_improvements: improvements,
+        session_resume_changes: changes,
+    }).catch(() => { });
 
     updateProgress(3);
-    document.getElementById("previewBtn").style.display  = "none";
+    document.getElementById("previewBtn").style.display = "none";
     document.getElementById("downloadBtn").style.display = "inline-flex";
-    document.getElementById("downloadBtn").disabled      = false;
+    document.getElementById("downloadBtn").disabled = false;
     updateProgress(5);
 
     setTimeout(() => {
@@ -1008,9 +1032,9 @@ async function handleDownloadClick() {
 
         // Stream the blob and trigger a native Save dialog
         const blob = await res.blob();
-        const url  = URL.createObjectURL(blob);
-        const a    = document.createElement("a");
-        a.href     = url;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
         a.download = "optimized_resume.pdf";
         document.body.appendChild(a);
         a.click();
@@ -1021,7 +1045,7 @@ async function handleDownloadClick() {
         showError("Download failed: " + (err.message || String(err)));
     } finally {
         btn.innerHTML = originalHTML;
-        btn.disabled  = false;
+        btn.disabled = false;
     }
 }
 
@@ -1049,15 +1073,15 @@ function updateUsageMeter(daily, monthly, weekly, limit) {
     const meter = document.getElementById("usageMeter");
     if (!meter) return;
 
-    const todayEl   = document.getElementById("usageToday");
-    const monthEl   = document.getElementById("usageMonth");
-    const weeklyEl  = document.getElementById("usageWeekly");
-    const limitEl   = document.getElementById("usageWeeklyLimit");
+    const todayEl = document.getElementById("usageToday");
+    const monthEl = document.getElementById("usageMonth");
+    const weeklyEl = document.getElementById("usageWeekly");
+    const limitEl = document.getElementById("usageWeeklyLimit");
 
-    if (todayEl)  todayEl.textContent  = daily;
-    if (monthEl)  monthEl.textContent  = monthly;
+    if (todayEl) todayEl.textContent = daily;
+    if (monthEl) monthEl.textContent = monthly;
     if (weeklyEl) weeklyEl.firstChild.textContent = weekly + " ";
-    if (limitEl)  limitEl.textContent  = `/ ${limit}`;
+    if (limitEl) limitEl.textContent = `/ ${limit}`;
 
     meter.style.display = "flex";
 }
@@ -1095,31 +1119,31 @@ function showError(msg) {
 }
 
 function showOptimizedScoreSection({ originalScore, optimizedScore, improvements }) {
-    const originalScoreDisplay  = document.getElementById("originalScoreDisplay");
+    const originalScoreDisplay = document.getElementById("originalScoreDisplay");
     const optimizedScoreDisplay = document.getElementById("optimizedScore");
-    const improvementTextEl     = document.getElementById("improvementText");
-    const improvementIndicator  = document.getElementById("improvementIndicator");
+    const improvementTextEl = document.getElementById("improvementText");
+    const improvementIndicator = document.getElementById("improvementIndicator");
 
-    originalScoreDisplay.textContent  = `${Math.round(originalScore)}%`;
+    originalScoreDisplay.textContent = `${Math.round(originalScore)}%`;
     optimizedScoreDisplay.textContent = `${Math.round(optimizedScore)}%`;
 
     const improvement = Math.round(optimizedScore - originalScore);
     if (improvement > 0) {
         improvementTextEl.textContent = `Improved by ${improvement}%! 🎉`;
-        improvementTextEl.className   = "improvement-text positive";
+        improvementTextEl.className = "improvement-text positive";
         improvementIndicator.style.background = "rgba(0, 212, 170, 0.1)";
     } else if (improvement === 0) {
         improvementTextEl.textContent = "Score maintained";
-        improvementTextEl.className   = "improvement-text neutral";
+        improvementTextEl.className = "improvement-text neutral";
         improvementIndicator.style.background = "rgba(136, 146, 176, 0.1)";
     } else {
         improvementTextEl.textContent = `Score decreased by ${Math.abs(improvement)}%`;
-        improvementTextEl.className   = "improvement-text negative";
+        improvementTextEl.className = "improvement-text negative";
         improvementIndicator.style.background = "rgba(255, 107, 107, 0.1)";
     }
 
     const section = document.getElementById("optimizedScoreSection");
-    section.style.display   = "block";
+    section.style.display = "block";
     section.style.animation = "slideIn 0.5s ease-out";
 
     setTimeout(() => {
@@ -1166,8 +1190,8 @@ async function probePageForJD() {
     const { session_jd } = await getFromStorage(["session_jd"]);
     if (session_jd) return;
 
-    const bar      = document.getElementById("fetchFromPageBar");
-    const label    = document.getElementById("fetchBarLabel");
+    const bar = document.getElementById("fetchFromPageBar");
+    const label = document.getElementById("fetchBarLabel");
     const fetchBtn = document.getElementById("fetchFromPageBtn");
     if (!bar || !label || !fetchBtn) return;
 
@@ -1179,9 +1203,9 @@ async function probePageForJD() {
     try {
         const result = await sendToBackground({ type: "FETCH_JD", payload: {} });
         if (result?.text) {
-            _pageJDCache   = result.text;
+            _pageJDCache = result.text;
             // Truncate label to ~50 chars for display
-            const preview  = result.text.replace(/\s+/g, " ").trim().slice(0, 50);
+            const preview = result.text.replace(/\s+/g, " ").trim().slice(0, 50);
             label.textContent = `Found on ${result.source}: "${preview}…"`;
             fetchBtn.disabled = false;
         } else {
@@ -1242,11 +1266,11 @@ async function handleFetchFromPageClick() {
  * @param {Array<{severity: string, label: string, items: string[]|null}>} changes
  */
 function renderChangelog(changes) {
-    const panel  = document.getElementById("changelogPanel");
-    const list   = document.getElementById("changelogList");
-    const badge  = document.getElementById("changelogBadge");
+    const panel = document.getElementById("changelogPanel");
+    const list = document.getElementById("changelogList");
+    const badge = document.getElementById("changelogBadge");
     const toggle = document.getElementById("changelogToggle");
-    const body   = document.getElementById("changelogBody");
+    const body = document.getElementById("changelogBody");
 
     if (!panel || !list || !changes || changes.length === 0) return;
 
@@ -1302,7 +1326,7 @@ function renderChangelog(changes) {
 
     // Show critical badge if needed
     if (criticalCount > 0) {
-        badge.textContent  = `${criticalCount} critical`;
+        badge.textContent = `${criticalCount} critical`;
         badge.style.display = "inline-block";
     } else {
         badge.style.display = "none";
@@ -1319,7 +1343,7 @@ function renderChangelog(changes) {
 
 /** Toggle open/close of the changelog body. */
 function handleChangelogToggle() {
-    const body   = document.getElementById("changelogBody");
+    const body = document.getElementById("changelogBody");
     const toggle = document.getElementById("changelogToggle");
     if (!body || !toggle) return;
 
@@ -1419,7 +1443,7 @@ function showUnverifiedBanner() {
 /** Call /auth/resend-verification and show feedback. */
 async function handleResendVerification() {
     const btn = document.getElementById("resendVerifyBtn") ||
-                document.getElementById("resendVerifyBannerBtn");
+        document.getElementById("resendVerifyBannerBtn");
     if (btn) { btn.disabled = true; btn.textContent = "Sending…"; }
 
     try {
