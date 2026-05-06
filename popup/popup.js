@@ -476,16 +476,26 @@ async function handleLogin(e) {
         if (!res.ok) throw data;
 
         await setToStorage({
-            access_token:  data.access_token,
-            user_email:    data.email,
-            user_id:       data.user_id,
+            access_token:   data.access_token,
+            user_email:     data.email,
+            user_id:        data.user_id,
+            has_resume:     data.has_resume,
+            resume_filename: null,
+            plan:           data.plan,
+            weekly_usage:   data.weekly_usage,
+            weekly_limit:   data.weekly_limit,
+            daily_usage:    data.daily_usage,
+            monthly_usage:  data.monthly_usage,
+        });
+        currentUser = {
+            email:         data.email,
             has_resume:    data.has_resume,
             resume_filename: null,
-            plan:          data.plan,
             weekly_usage:  data.weekly_usage,
             weekly_limit:  data.weekly_limit,
-        });
-        currentUser = { email: data.email, has_resume: data.has_resume, resume_filename: null };
+            daily_usage:   data.daily_usage,
+            monthly_usage: data.monthly_usage,
+        };
         showMainApp();
     } catch (error) {
         errorEl.textContent = apiErrorMessage(error, "Login failed. Please try again.");
@@ -519,16 +529,26 @@ async function handleSignup(e) {
         if (!res.ok) throw data;
 
         await setToStorage({
-            access_token:  data.access_token,
-            user_email:    data.email,
-            user_id:       data.user_id,
+            access_token:   data.access_token,
+            user_email:     data.email,
+            user_id:        data.user_id,
+            has_resume:     data.has_resume,
+            resume_filename: null,
+            plan:           data.plan,
+            weekly_usage:   data.weekly_usage,
+            weekly_limit:   data.weekly_limit,
+            daily_usage:    data.daily_usage,
+            monthly_usage:  data.monthly_usage,
+        });
+        currentUser = {
+            email:         data.email,
             has_resume:    data.has_resume,
             resume_filename: null,
-            plan:          data.plan,
             weekly_usage:  data.weekly_usage,
             weekly_limit:  data.weekly_limit,
-        });
-        currentUser = { email: data.email, has_resume: data.has_resume, resume_filename: null };
+            daily_usage:   data.daily_usage,
+            monthly_usage: data.monthly_usage,
+        };
         showMainApp();
     } catch (error) {
         errorEl.textContent = apiErrorMessage(error, "Signup failed. Please try again.");
