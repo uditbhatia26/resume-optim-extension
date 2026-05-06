@@ -861,6 +861,13 @@ function handleReadMoreClick() {
  */
 async function handleAnalyzeClick() {
     const btn = document.getElementById("analyzeBtn");
+
+    // Guard: resume must be uploaded before analysis can run
+    if (!currentUser?.has_resume) {
+        showError("Please upload your resume first before analyzing compatibility.");
+        return;
+    }
+
     btn.disabled = true;
     showLoadingState(btn, "Analyzing...");
     TaskProgress.start("Analyzing resume compatibility", 15_000);
@@ -879,6 +886,7 @@ async function handleAnalyzeClick() {
     // Poll storage every second (catches result even if popup closes and reopens)
     startAnalyzePoller();
 }
+
 
 function handleAnalyzeDone(atsScore) {
     TaskProgress.done();
