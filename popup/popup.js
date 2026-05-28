@@ -812,12 +812,6 @@ async function handleResumeUpload(e) {
         return;
     }
 
-    // Client-side size cap before wasting time on base64 conversion
-    if (file.size > 3 * 1024 * 1024) {
-        showUploadError("File must be smaller than 2 MB.");
-        return;
-    }
-
     // Show uploading state immediately
     showUploadingState(true, file.name);
 
