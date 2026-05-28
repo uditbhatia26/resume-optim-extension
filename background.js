@@ -3,7 +3,9 @@
 // Owns all long-running API calls so they survive a closed popup.
 // ============================================================
 
-const API_BASE = "http://localhost:8000";
+// ⚠️ Swap to production URL before deploying to Chrome Web Store
+const CONFIG = { API_BASE: "http://localhost:8000" };
+const API_BASE = CONFIG.API_BASE;
 
 // ---- Storage helpers ----
 function getFromStorage(keys) {

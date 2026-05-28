@@ -1,7 +1,14 @@
 // ============================
 // Global variables
 // ============================
-const API_BASE = "http://localhost:8000"; // ← swap to production URL before deploying
+// ============================
+// Config
+// ============================
+const CONFIG = {
+    // ⚠️ Swap to production URL before deploying to Chrome Web Store
+    API_BASE: "http://localhost:8000",
+};
+const API_BASE = CONFIG.API_BASE; // shorthand alias used throughout
 let jobDescriptionFull = "";
 let isExpanded = false;
 let currentUser = null;
@@ -587,7 +594,7 @@ async function handleLogin(e) {
             user_email: data.email,
             user_id: data.user_id,
             has_resume: data.has_resume,
-            resume_filename: null,
+            resume_filename: data.resume_filename || null,
             plan: data.plan,
             email_verified: data.email_verified,
             weekly_usage: data.weekly_usage,
@@ -598,7 +605,7 @@ async function handleLogin(e) {
         currentUser = {
             email: data.email,
             has_resume: data.has_resume,
-            resume_filename: null,
+            resume_filename: data.resume_filename || null,
             email_verified: data.email_verified,
             weekly_usage: data.weekly_usage,
             weekly_limit: data.weekly_limit,
@@ -642,8 +649,7 @@ async function handleSignup(e) {
             user_email: data.email,
             user_id: data.user_id,
             has_resume: data.has_resume,
-            resume_filename: null,
-            plan: data.plan,
+            resume_filename: data.resume_filename || null,
             email_verified: data.email_verified,
             weekly_usage: data.weekly_usage,
             weekly_limit: data.weekly_limit,
@@ -653,7 +659,7 @@ async function handleSignup(e) {
         currentUser = {
             email: data.email,
             has_resume: data.has_resume,
-            resume_filename: null,
+            resume_filename: data.resume_filename || null,
             email_verified: data.email_verified,
             weekly_usage: data.weekly_usage,
             weekly_limit: data.weekly_limit,
@@ -1400,8 +1406,8 @@ async function probePageForJD() {
     const fetchBtn = document.getElementById("fetchFromPageBtn");
     if (!bar || !label || !fetchBtn) return;
 
-    // Show bar in "detecting…" state
-    bar.style.display = "flex";
+    // Hide bar immediately — reveal only once we confirm a JD is found (fixes flash)
+    bar.style.display = "none";
     label.textContent = "Detecting job description…";
     fetchBtn.disabled = true;
 
@@ -1412,14 +1418,12 @@ async function probePageForJD() {
             // Truncate label to ~50 chars for display
             const preview = result.text.replace(/\s+/g, " ").trim().slice(0, 50);
             label.textContent = `Found on ${result.source}: "${preview}…"`;
+            bar.style.display = "flex";
             fetchBtn.disabled = false;
-        } else {
-            // Nothing found — hide the bar silently
-            bar.style.display = "none";
         }
+        // Nothing found — bar stays hidden
     } catch (_) {
-        // Could not access tab (e.g. chrome:// page, extension page, etc.) — hide silently
-        bar.style.display = "none";
+        // Could not access tab (e.g. chrome:// page) — keep bar hidden
     }
 }
 
