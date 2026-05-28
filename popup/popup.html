@@ -91,6 +91,8 @@
 
         <!-- Usage Meter Strip -->
         <div id="usageMeter" class="usage-meter" style="display:none;">
+            <span id="planBadge" class="plan-badge">FREE</span>
+            <div class="usage-meter-divider"></div>
             <div class="usage-meter-item">
                 <span class="usage-meter-label">Today</span>
                 <span class="usage-meter-value" id="usageToday">0</span>
@@ -105,6 +107,12 @@
                 <span class="usage-meter-label">Weekly limit</span>
                 <span class="usage-meter-value" id="usageWeekly">0 <span id="usageWeeklyLimit"></span></span>
             </div>
+        </div>
+
+        <!-- Upgrade CTA — shown only when free-tier limit is hit -->
+        <div id="upgradeCta" class="upgrade-cta-banner" style="display:none;">
+            <span class="upgrade-cta-text">⚡ Weekly limit reached &mdash; <strong>Upgrade to Pro</strong> for 30 generations/week</span>
+            <a id="upgradeCtaBtn" class="upgrade-cta-btn" href="#" target="_blank">Upgrade</a>
         </div>
 
         <div class="main-content">

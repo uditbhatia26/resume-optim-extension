@@ -504,10 +504,11 @@ async function showMainApp() {
 
     // Show usage meter from stored auth data
     updateUsageMeter(
-        currentUser?.daily_usage ?? 0,
+        currentUser?.daily_usage  ?? 0,
         currentUser?.monthly_usage ?? 0,
-        currentUser?.weekly_usage ?? 0,
-        currentUser?.weekly_limit ?? 5,
+        currentUser?.weekly_usage  ?? 0,
+        currentUser?.weekly_limit  ?? 5,
+        currentUser?.plan          ?? "free",
     );
 
     // Remind unverified users to check their inbox
@@ -1118,10 +1119,11 @@ function handleOptimizeDone(data) {
 
     // Update usage meter with fresh counts from the optimize response
     updateUsageMeter(
-        data.daily_usage ?? 0,
+        data.daily_usage  ?? 0,
         data.monthly_usage ?? 0,
-        data.weekly_usage ?? 0,
-        data.weekly_limit ?? 5,
+        data.weekly_usage  ?? 0,
+        data.weekly_limit  ?? 5,
+        data.plan          ?? currentUser?.plan ?? "free",
     );
 
     // Persist so the safety-net in restoreSession also finds YAML
@@ -1222,24 +1224,44 @@ async function handleRecalculateClick() {
 
 /**
  * Update the usage meter strip with the latest counts.
+/**
  * @param {number} daily    - resumes generated today
  * @param {number} monthly  - resumes generated this calendar month
  * @param {number} weekly   - resumes generated this week (for limit display)
  * @param {number} limit    - weekly plan limit
+ * @param {string} plan     - "free" | "pro"
  */
-function updateUsageMeter(daily, monthly, weekly, limit) {
+function updateUsageMeter(daily, monthly, weekly, limit, plan = "free") {
     const meter = document.getElementById("usageMeter");
     if (!meter) return;
 
-    const todayEl = document.getElementById("usageToday");
-    const monthEl = document.getElementById("usageMonth");
-    const weeklyEl = document.getElementById("usageWeekly");
-    const limitEl = document.getElementById("usageWeeklyLimit");
+    const todayEl   = document.getElementById("usageToday");
+    const monthEl   = document.getElementById("usageMonth");
+    const weeklyEl  = document.getElementById("usageWeekly");
+    const limitEl   = document.getElementById("usageWeeklyLimit");
+    const badgeEl   = document.getElementById("planBadge");
+    const ctaBanner = document.getElementById("upgradeCta");
 
-    if (todayEl) todayEl.textContent = daily;
-    if (monthEl) monthEl.textContent = monthly;
+    if (todayEl)  todayEl.textContent = daily;
+    if (monthEl)  monthEl.textContent = monthly;
     if (weeklyEl) weeklyEl.firstChild.textContent = weekly + " ";
-    if (limitEl) limitEl.textContent = `/ ${limit}`;
+    if (limitEl)  limitEl.textContent = `/ ${limit}`;
+
+    // Plan badge
+    if (badgeEl) {
+        const isPro = (plan === "pro");
+        badgeEl.textContent = isPro ? "PRO ✦" : "FREE";
+        badgeEl.className   = isPro ? "plan-badge plan-badge--pro" : "plan-badge";
+    }
+
+    // Upgrade CTA — only for free users who have exhausted their weekly limit
+    if (ctaBanner) {
+        const limitHit = (plan !== "pro") && (weekly >= limit);
+        ctaBanner.style.display = limitHit ? "flex" : "none";
+        // Point upgrade link to the dashboard (opens in a new tab)
+        const upgradeBtn = document.getElementById("upgradeCtaBtn");
+        if (upgradeBtn) upgradeBtn.href = "http://localhost:5173"; // swap for production URL
+    }
 
     meter.style.display = "flex";
 }
