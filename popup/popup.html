@@ -154,12 +154,109 @@
                 <input type="file" id="resumeFileInput" accept=".pdf" style="display:none;" />
             </div>
 
-            <!-- Original Match Score Section -->
+            <!-- ATS Score Breakdown Card (shown after analyze) -->
+            <div id="atsBreakdownCard" class="ats-breakdown-card" style="display:none;">
 
-            <div class="status-section">
-                <div class="status-header">
-                    <div class="status-title">Original Match Score</div>
+                <!-- Always-visible summary row -->
+                <button class="ats-summary-row" id="atsToggleBtn" aria-expanded="false">
+                    <div class="ats-summary-left">
+                        <div class="ats-summary-title-wrap">
+                            <span class="ats-summary-bar"></span>
+                            <span class="ats-summary-title">ATS Score</span>
+                        </div>
+                        <div class="ats-summary-scores">
+                            <span id="atsSummaryScore" class="ats-summary-score">--</span>
+                            <span id="atsSummaryBadge" class="ats-match-badge"></span>
+                        </div>
+                    </div>
+                    <div class="ats-summary-right">
+                        <span class="ats-toggle-hint">Details</span>
+                        <svg id="atsChevron" class="ats-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </div>
+                </button>
+
+                <!-- Collapsible body -->
+                <div id="atsBreakdownBody" class="ats-breakdown-body-wrap" style="display:none;">
+                    <div class="ats-breakdown-inner">
+
+                        <!-- Circular gauge -->
+                        <div class="ats-gauge-wrap">
+                            <div class="ats-gauge-ring-wrap">
+                                <svg class="ats-gauge-svg" viewBox="0 0 100 100">
+                                    <circle class="ats-gauge-track" cx="50" cy="50" r="40" />
+                                    <circle id="atsGaugeFill" class="ats-gauge-fill" cx="50" cy="50" r="40"
+                                        stroke-dasharray="0 251.3" />
+                                </svg>
+                                <div class="ats-gauge-center">
+                                    <div class="ats-gauge-score"><span id="atsGaugeValue">--</span><span class="ats-gauge-pct">%</span></div>
+                                    <div class="ats-gauge-label">OVERALL</div>
+                                </div>
+                            </div>
+                            <div id="atsImprovementChip" class="ats-improvement-chip" style="display:none;"></div>
+                        </div>
+
+                        <!-- Sub-score rows -->
+                        <div class="ats-sub-scores">
+                            <div class="ats-sub-row">
+                                <div class="ats-sub-icon ats-icon-keyword">🔍</div>
+                                <div class="ats-sub-info">
+                                    <div class="ats-sub-name">Keyword Match</div>
+                                    <div class="ats-sub-bar-wrap"><div id="atsBarKeyword" class="ats-sub-bar ats-bar-keyword" style="width:0%"></div></div>
+                                </div>
+                                <div class="ats-sub-right">
+                                    <span id="atsValKeyword" class="ats-sub-pct">--%</span>
+                                    <span id="atsLblKeyword" class="ats-sub-badge"></span>
+                                </div>
+                            </div>
+                            <div class="ats-sub-row">
+                                <div class="ats-sub-icon ats-icon-skills">💼</div>
+                                <div class="ats-sub-info">
+                                    <div class="ats-sub-name">Skills Coverage</div>
+                                    <div class="ats-sub-bar-wrap"><div id="atsBarSkills" class="ats-sub-bar ats-bar-skills" style="width:0%"></div></div>
+                                </div>
+                                <div class="ats-sub-right">
+                                    <span id="atsValSkills" class="ats-sub-pct">--%</span>
+                                    <span id="atsLblSkills" class="ats-sub-badge"></span>
+                                </div>
+                            </div>
+                            <div class="ats-sub-row">
+                                <div class="ats-sub-icon ats-icon-format">📄</div>
+                                <div class="ats-sub-info">
+                                    <div class="ats-sub-name">Formatting</div>
+                                    <div class="ats-sub-bar-wrap"><div id="atsBarFormat" class="ats-sub-bar ats-bar-format" style="width:0%"></div></div>
+                                </div>
+                                <div class="ats-sub-right">
+                                    <span id="atsValFormat" class="ats-sub-pct">--%</span>
+                                    <span id="atsLblFormat" class="ats-sub-badge"></span>
+                                </div>
+                            </div>
+                            <div class="ats-sub-row">
+                                <div class="ats-sub-icon ats-icon-exp">🎯</div>
+                                <div class="ats-sub-info">
+                                    <div class="ats-sub-name">Experience Fit</div>
+                                    <div class="ats-sub-bar-wrap"><div id="atsBarExp" class="ats-sub-bar ats-bar-exp" style="width:0%"></div></div>
+                                </div>
+                                <div class="ats-sub-right">
+                                    <span id="atsValExp" class="ats-sub-pct">--%</span>
+                                    <span id="atsLblExp" class="ats-sub-badge"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI Insight strip -->
+                    <div id="atsInsightStrip" class="ats-insight-strip" style="display:none;">
+                        <div class="ats-insight-icon">💡</div>
+                        <div class="ats-insight-text" id="atsInsightText"></div>
+                    </div>
                 </div>
+            </div>
+
+            <!-- Fallback plain score (hidden once breakdown shows) -->
+            <div id="originalScoreFallback" class="status-section" style="display:none;">
+                <div class="status-header"><div class="status-title">Original Match Score</div></div>
                 <div class="status-value" id="originalScore">--</div>
             </div>
 

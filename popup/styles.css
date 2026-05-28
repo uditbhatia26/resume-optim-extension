@@ -288,6 +288,322 @@ body {
     border-color: rgba(255, 20, 147, 0.3);
 }
 
+/* ---- ATS Score Breakdown Card ---- */
+.ats-breakdown-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(138, 43, 226, 0.18);
+    border-radius: 14px;
+    margin-bottom: 16px;
+    overflow: hidden;
+    animation: slideIn 0.3s ease-out;
+}
+
+/* ---- Summary row (always visible, acts as toggle) ---- */
+.ats-summary-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 11px 14px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    gap: 10px;
+    transition: background 0.2s ease;
+}
+
+.ats-summary-row:hover {
+    background: rgba(138, 43, 226, 0.05);
+}
+
+.ats-summary-left {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    flex: 1;
+    min-width: 0;
+}
+
+.ats-summary-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.ats-summary-bar {
+    display: inline-block;
+    width: 3px;
+    height: 12px;
+    background: linear-gradient(180deg, #8A2BE2, #FF1493);
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.ats-summary-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #8892b0;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+}
+
+.ats-summary-scores {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-left: 10px;
+}
+
+.ats-summary-score {
+    font-size: 22px;
+    font-weight: 900;
+    color: #e6f1ff;
+    letter-spacing: -0.5px;
+    line-height: 1;
+}
+
+.ats-summary-right {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+}
+
+.ats-toggle-hint {
+    font-size: 10px;
+    font-weight: 600;
+    color: #8892b0;
+    letter-spacing: 0.2px;
+}
+
+.ats-chevron {
+    width: 16px;
+    height: 16px;
+    color: #8892b0;
+    transition: transform 0.25s ease, color 0.2s;
+    flex-shrink: 0;
+}
+
+.ats-chevron.open {
+    transform: rotate(180deg);
+    color: #b794f6;
+}
+
+/* ---- Match-level badge ---- */
+.ats-match-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 99px;
+    letter-spacing: 0.2px;
+    white-space: nowrap;
+}
+.ats-badge-excellent { background: rgba(0,212,170,0.14); border: 1px solid rgba(0,212,170,0.3); color: #00d4aa; }
+.ats-badge-great     { background: rgba(99,179,237,0.14); border: 1px solid rgba(99,179,237,0.3); color: #63b3ed; }
+.ats-badge-good      { background: rgba(183,148,246,0.14); border: 1px solid rgba(183,148,246,0.3); color: #b794f6; }
+.ats-badge-fair      { background: rgba(255,184,0,0.14); border: 1px solid rgba(255,184,0,0.3); color: #f6e05e; }
+.ats-badge-poor      { background: rgba(255,107,107,0.14); border: 1px solid rgba(255,107,107,0.3); color: #ff6b6b; }
+
+/* ---- Collapsible body ---- */
+.ats-breakdown-body-wrap {
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.ats-breakdown-inner {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 14px 14px 12px;
+}
+
+/* ---- Circular gauge ---- */
+.ats-gauge-wrap {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.ats-gauge-ring-wrap {
+    position: relative;
+    width: 90px;
+    height: 90px;
+}
+
+.ats-gauge-svg {
+    width: 90px;
+    height: 90px;
+    transform: rotate(-90deg);
+}
+
+.ats-gauge-track {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.07);
+    stroke-width: 9;
+}
+
+.ats-gauge-fill {
+    fill: none;
+    stroke-width: 9;
+    stroke-linecap: round;
+    stroke: #b794f6;
+    filter: drop-shadow(0 0 5px rgba(138, 43, 226, 0.55));
+    transition: stroke-dasharray 0.85s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ats-gauge-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.ats-gauge-score {
+    font-size: 18px;
+    font-weight: 900;
+    color: #e6f1ff;
+    letter-spacing: -0.5px;
+}
+
+.ats-gauge-pct {
+    font-size: 11px;
+    font-weight: 700;
+    color: #b794f6;
+}
+
+.ats-gauge-label {
+    font-size: 7.5px;
+    font-weight: 700;
+    color: #8892b0;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-top: 3px;
+}
+
+.ats-improvement-chip {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: #00d4aa;
+    background: rgba(0, 212, 170, 0.1);
+    border: 1px solid rgba(0, 212, 170, 0.22);
+    border-radius: 99px;
+    padding: 2px 8px;
+    white-space: nowrap;
+}
+
+/* ---- Sub-score rows ---- */
+.ats-sub-scores {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+}
+
+.ats-sub-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ats-sub-icon {
+    font-size: 13px;
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.ats-icon-keyword { background: rgba(255, 20, 147, 0.1); }
+.ats-icon-skills  { background: rgba(99, 179, 237, 0.1); }
+.ats-icon-format  { background: rgba(0, 212, 170, 0.1); }
+.ats-icon-exp     { background: rgba(255, 184, 0, 0.1); }
+
+.ats-sub-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.ats-sub-name {
+    font-size: 10.5px;
+    font-weight: 600;
+    color: #cbd5e0;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ats-sub-bar-wrap {
+    height: 3px;
+    background: rgba(255, 255, 255, 0.07);
+    border-radius: 99px;
+    overflow: hidden;
+}
+
+.ats-sub-bar {
+    height: 100%;
+    border-radius: 99px;
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.ats-bar-keyword { background: linear-gradient(90deg, #FF1493, #ff6b9d); }
+.ats-bar-skills  { background: linear-gradient(90deg, #4299e1, #63b3ed); }
+.ats-bar-format  { background: linear-gradient(90deg, #00d4aa, #00b894); }
+.ats-bar-exp     { background: linear-gradient(90deg, #f6c90e, #f6a623); }
+
+.ats-sub-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    flex-shrink: 0;
+    width: 52px;
+}
+
+.ats-sub-pct {
+    font-size: 12px;
+    font-weight: 800;
+    color: #e6f1ff;
+    line-height: 1;
+}
+
+.ats-sub-badge {
+    font-size: 8px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 99px;
+    white-space: nowrap;
+}
+
+/* ---- AI Insight strip ---- */
+.ats-insight-strip {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 10px 14px;
+    background: rgba(138, 43, 226, 0.06);
+    border-top: 1px solid rgba(138, 43, 226, 0.1);
+}
+
+.ats-insight-icon {
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.ats-insight-text {
+    font-size: 10.5px;
+    color: #b794f6;
+    line-height: 1.5;
+}
+
 /* Status section */
 
 .status-section {

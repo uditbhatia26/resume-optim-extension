@@ -74,7 +74,7 @@ async function saveSession(patch) {
 async function restoreSession() {
     const s = await getFromStorage([
         "session_jd", "session_jd_cache_id",
-        "session_ats_score", "session_optimized_score",
+        "session_ats_score", "session_ats_breakdown", "session_optimized_score",
         "session_improvements", "session_progress",
         "session_optimized_yaml", "optimization_status", "optimization_error",
         "analyze_status", "analyze_error",
@@ -111,7 +111,12 @@ async function restoreSession() {
         showError("Analysis failed: " + (s.analyze_error || "Unknown error"));
         document.getElementById("analyzeBtn").disabled = false;
     } else if (s.session_ats_score != null) {
-        document.getElementById("originalScore").textContent = `${Math.round(s.session_ats_score)}%`;
+        const origEl = document.getElementById("originalScore");
+        if (origEl) origEl.textContent = `${Math.round(s.session_ats_score)}%`;
+        // Restore breakdown card if we have saved data
+        if (s.session_ats_breakdown) {
+            try { renderATSBreakdown(JSON.parse(s.session_ats_breakdown)); } catch (_) { }
+        }
         document.getElementById("analyzeBtn").disabled = false;
         document.getElementById("generateBtn").disabled = false;
         updateProgress(2);
@@ -170,10 +175,14 @@ function stopUploadPoller() {
 function startAnalyzePoller() {
     if (_analyzePollerTimer) return;
     _analyzePollerTimer = setInterval(async () => {
-        const s = await getFromStorage(["analyze_status", "analyze_error", "session_ats_score"]);
+        const s = await getFromStorage(["analyze_status", "analyze_error", "session_ats_score", "session_ats_breakdown"]);
         if (s.analyze_status === "done" && s.session_ats_score != null) {
             clearInterval(_analyzePollerTimer); _analyzePollerTimer = null;
-            handleAnalyzeDone(s.session_ats_score);
+            let breakdownObj = null;
+            if (s.session_ats_breakdown) {
+                try { breakdownObj = JSON.parse(s.session_ats_breakdown); } catch (_) {}
+            }
+            handleAnalyzeDone(s.session_ats_score, breakdownObj);
         } else if (s.analyze_status === "error") {
             clearInterval(_analyzePollerTimer); _analyzePollerTimer = null;
             handleAnalyzeError(s.analyze_error || "Unknown error");
@@ -455,7 +464,7 @@ function listenToBackground() {
                 break;
             case "ANALYZE_DONE":
                 stopAnalyzePoller();
-                handleAnalyzeDone(message.payload.overall_score);
+                handleAnalyzeDone(message.payload.overall_score, message.payload);
                 break;
             case "ANALYZE_ERROR":
                 stopAnalyzePoller();
@@ -548,6 +557,7 @@ function initializeEventListeners() {
     document.getElementById("downloadBtn")?.addEventListener("click", handleDownloadClick);
     document.getElementById("recalculateBtn")?.addEventListener("click", handleRecalculateClick);
     document.getElementById("changelogToggle")?.addEventListener("click", handleChangelogToggle);
+    document.getElementById("atsToggleBtn")?.addEventListener("click", handleATSToggle);
 
     const jobDescInput = document.getElementById("jobDescriptionInput");
     if (jobDescInput) jobDescInput.addEventListener("input", handleJobDescriptionInputChange);
@@ -1039,7 +1049,7 @@ async function handleAnalyzeClick() {
 }
 
 
-function handleAnalyzeDone(atsScore) {
+function handleAnalyzeDone(atsScore, breakdown) {
     TaskProgress.done();
     const btn = document.getElementById("analyzeBtn");
     if (btn) {
@@ -1047,13 +1057,123 @@ function handleAnalyzeDone(atsScore) {
             '<svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Analyze Compatibility';
         btn.disabled = false;
     }
-    document.getElementById("originalScore").textContent = `${Math.round(atsScore)}%`;
+    // Keep the plain fallback value in sync (used by optimise flow)
+    const origEl = document.getElementById("originalScore");
+    if (origEl) origEl.textContent = `${Math.round(atsScore)}%`;
+
+    if (breakdown) {
+        renderATSBreakdown(breakdown);
+        saveSession({
+            session_ats_score:     atsScore,
+            session_ats_breakdown: JSON.stringify(breakdown),
+            session_progress: 2,
+            analyze_status: "done",
+        }).catch(() => { });
+    } else {
+        saveSession({ session_ats_score: atsScore, session_progress: 2, analyze_status: "done" }).catch(() => { });
+    }
+
     updateProgress(2);
     document.getElementById("generateBtn").disabled = false;
-    saveSession({ session_ats_score: atsScore, session_progress: 2, analyze_status: "done" }).catch(() => { });
     setTimeout(() => {
-        document.getElementById("originalScore")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        document.getElementById("atsBreakdownCard")?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 100);
+}
+
+// ==============================
+// ATS Score Breakdown Renderer
+// ==============================
+function scoreLabel(v) {
+    if (v >= 90) return "Excellent";
+    if (v >= 75) return "Great";
+    if (v >= 60) return "Good";
+    if (v >= 45) return "Fair";
+    return "Poor";
+}
+
+function handleATSToggle() {
+    const body = document.getElementById("atsBreakdownBody");
+    const btn = document.getElementById("atsToggleBtn");
+    const chevron = document.getElementById("atsChevron");
+    if (!body || !btn || !chevron) return;
+
+    const isOpen = body.style.display !== "none";
+    body.style.display = isOpen ? "none" : "block";
+    btn.setAttribute("aria-expanded", !isOpen);
+    chevron.classList.toggle("open", !isOpen);
+}
+
+function renderATSBreakdown(data, prevScore) {
+    const card = document.getElementById("atsBreakdownCard");
+    if (!card) return;
+
+    const overall = Math.round(data.overall_score ?? 0);
+    const kw      = Math.round(data.keyword_analysis?.keyword_density_score   ?? 0);
+    const sk      = Math.round(data.skills_analysis?.skills_alignment_score   ?? 0);
+    const fmt     = Math.round(data.formatting_score?.readability_score        ?? 0);
+    const exp     = Math.round(data.experience_alignment?.experience_score     ?? 0);
+
+    // Update summary row elements
+    const summaryScore = document.getElementById("atsSummaryScore");
+    if (summaryScore) summaryScore.textContent = overall + "%";
+
+    const summaryBadge = document.getElementById("atsSummaryBadge");
+    if (summaryBadge) {
+        const level = data.match_level || scoreLabel(overall);
+        summaryBadge.textContent = "Score " + level;
+        summaryBadge.className = "ats-match-badge ats-badge-" + level.toLowerCase();
+    }
+
+    // Gauge — circumference for r=40 is 2π*40 ≈ 251.3
+    const CIRC = 251.3;
+    const fill = (overall / 100) * CIRC;
+    const gaugeEl = document.getElementById("atsGaugeFill");
+    if (gaugeEl) {
+        gaugeEl.style.strokeDasharray = `0 ${CIRC}`; // reset
+        setTimeout(() => {
+            gaugeEl.style.strokeDasharray = `${fill} ${CIRC}`;
+        }, 80);
+    }
+    const gv = document.getElementById("atsGaugeValue");
+    if (gv) gv.textContent = overall;
+
+    // Improvement chip (only if prevScore provided)
+    const chip = document.getElementById("atsImprovementChip");
+    if (chip && prevScore != null && overall > prevScore) {
+        chip.textContent = `↑ ${overall - Math.round(prevScore)}% vs previous`;
+        chip.style.display = "block";
+    } else if (chip) {
+        chip.style.display = "none";
+    }
+
+    // Sub-score bars
+    const rows = [
+        { bar: "atsBarKeyword", val: "atsValKeyword", lbl: "atsLblKeyword", score: kw,  cls: "keyword" },
+        { bar: "atsBarSkills",  val: "atsValSkills",  lbl: "atsLblSkills",  score: sk,  cls: "skills"  },
+        { bar: "atsBarFormat",  val: "atsValFormat",  lbl: "atsLblFormat",  score: fmt, cls: "format"  },
+        { bar: "atsBarExp",     val: "atsValExp",     lbl: "atsLblExp",     score: exp, cls: "exp"     },
+    ];
+    rows.forEach(({ bar, val, lbl, score, cls }) => {
+        const barEl = document.getElementById(bar);
+        const valEl = document.getElementById(val);
+        const lblEl = document.getElementById(lbl);
+        if (barEl) { barEl.style.width = "0%"; setTimeout(() => { barEl.style.width = score + "%"; }, 80); }
+        if (valEl) valEl.textContent = score + "%";
+        if (lblEl) { lblEl.textContent = scoreLabel(score); lblEl.className = `ats-sub-badge ats-badge-${scoreLabel(score).toLowerCase()}`; }
+    });
+
+    // AI Insight — pick the first critical improvement if any, else first strength
+    const insightStrip = document.getElementById("atsInsightStrip");
+    const insightText  = document.getElementById("atsInsightText");
+    const insight = (data.critical_improvements?.[0]) || (data.strengths?.[0]) || null;
+    if (insightStrip && insightText && insight) {
+        insightText.textContent = insight;
+        insightStrip.style.display = "flex";
+    } else if (insightStrip) {
+        insightStrip.style.display = "none";
+    }
+
+    card.style.display = "block";
 }
 
 function handleAnalyzeError(errMsg) {
