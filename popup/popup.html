@@ -91,33 +91,76 @@
             </div>
         </div>
 
-        <!-- Usage Meter Strip -->
-        <div id="usageMeter" class="usage-meter" style="display:none;">
-            <span id="planBadge" class="plan-badge">FREE</span>
-            <div class="usage-meter-divider"></div>
-            <div class="usage-meter-item">
-                <span class="usage-meter-label">Today</span>
-                <span class="usage-meter-value" id="usageToday">0</span>
+        <!-- AI Provider Status Chip -->
+        <div id="aiKeyStatusBar" class="ai-key-status-bar" style="display:none;">
+            <div class="ai-key-chip" id="aiKeyChip">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="flex-shrink:0;">
+                    <path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/>
+                </svg>
+                <span id="aiKeyChipText">No API key set</span>
             </div>
-            <div class="usage-meter-divider"></div>
-            <div class="usage-meter-item">
-                <span class="usage-meter-label">This Month</span>
-                <span class="usage-meter-value" id="usageMonth">0</span>
-            </div>
-            <div class="usage-meter-divider"></div>
-            <div class="usage-meter-item">
-                <span class="usage-meter-label">Weekly limit</span>
-                <span class="usage-meter-value" id="usageWeekly">0 <span id="usageWeeklyLimit"></span></span>
-            </div>
-        </div>
-
-        <!-- Upgrade CTA — shown only when free-tier limit is hit -->
-        <div id="upgradeCta" class="upgrade-cta-banner" style="display:none;">
-            <span class="upgrade-cta-text">⚡ Weekly limit reached &mdash; <strong>Upgrade to Pro</strong> for 30 generations/week</span>
-            <a id="upgradeCtaBtn" class="upgrade-cta-btn" href="#" target="_blank">Upgrade</a>
+            <button class="ai-key-change-btn" id="aiKeyChangeBtn">Configure</button>
         </div>
 
         <div class="main-content">
+            <!-- AI Provider / API Key Section -->
+            <div class="action-section" id="aiKeySection">
+                <div class="section-title">AI Provider</div>
+
+                <!-- Saved key state -->
+                <div id="aiKeySavedState" style="display:none;">
+                    <div class="resume-uploaded-card">
+                        <div class="resume-file-info">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="color:#0057FF;flex-shrink:0;">
+                                <path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/>
+                            </svg>
+                            <span class="resume-filename-text" id="aiKeyProviderText">OpenAI</span>
+                            <span class="ai-key-masked" id="aiKeyMaskedText">sk-...????</span>
+                        </div>
+                        <button class="change-resume-btn" id="aiKeyEditBtn">Change</button>
+                    </div>
+                </div>
+
+                <!-- Key entry form -->
+                <div id="aiKeyFormState">
+                    <div class="ai-key-form">
+                        <div class="ai-key-field">
+                            <label class="ai-key-label" for="providerSelect">Provider</label>
+                            <select class="ai-key-select" id="providerSelect">
+                                <option value="openai">OpenAI (GPT-4o-mini)</option>
+                                <option value="anthropic">Anthropic (Claude Haiku)</option>
+                                <option value="google">Google Gemini (Flash)</option>
+                                <option value="groq">Groq (Llama 3.3 70B)</option>
+                                <option value="openrouter">OpenRouter (Custom)</option>
+                            </select>
+                        </div>
+                        <div class="ai-key-field">
+                            <label class="ai-key-label" for="apiKeyInput">API Key</label>
+                            <div class="ai-key-input-row">
+                                <input type="password" class="ai-key-input" id="apiKeyInput"
+                                    placeholder="Paste your API key here" autocomplete="off" />
+                                <button class="ai-key-toggle-btn" id="apiKeyToggleBtn" title="Show/hide key">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zm0 13c-3.04 0-5.5-2.46-5.5-5.5S8.96 6.5 12 6.5s5.5 2.46 5.5 5.5S15.04 17.5 12 17.5zm0-9c-1.93 0-3.5 1.57-3.5 3.5s1.57 3.5 3.5 3.5 3.5-1.57 3.5-3.5S13.93 8.5 12 8.5z"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="ai-key-field" id="modelFieldWrapper">
+                            <label class="ai-key-label" for="modelInput">Model <span class="ai-key-optional">(optional)</span></label>
+                            <input type="text" class="ai-key-input" id="modelInput"
+                                placeholder="Leave blank for provider default" autocomplete="off" />
+                        </div>
+                        <div id="aiKeyError" class="error-message"></div>
+                        <div id="aiKeySuccess" class="ai-key-success" style="display:none;"></div>
+                        <div class="ai-key-actions">
+                            <button class="btn btn-outline" id="aiKeyTestBtn">Test Connection</button>
+                            <button class="btn btn-primary" id="aiKeySaveBtn">Save Key</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Resume Upload Section -->
             <div class="action-section" id="resumeSection">
                 <div class="section-title">Your Resume</div>

@@ -26,16 +26,30 @@ function notifyPopup(message) {
 
 // ---- Generic authenticated fetch ----
 async function apiFetch(path, { method = "POST", body = null, isFormData = false } = {}) {
-    const { access_token } = await getFromStorage(["access_token"]);
+    const stored = await getFromStorage(["access_token", "ai_provider", "ai_api_key", "ai_model"]);
+    const { access_token, ai_provider, ai_api_key, ai_model } = stored;
     if (!access_token) throw new Error("Not authenticated");
 
     const headers = { Authorization: `Bearer ${access_token}` };
     if (!isFormData) headers["Content-Type"] = "application/json";
 
+    // Attach BYOK config to JSON bodies (FormData endpoints handle it separately)
+    let finalBody = body;
+    if (!isFormData && body && typeof body === "object" && ai_provider && ai_api_key) {
+        finalBody = {
+            ...body,
+            ai_config: {
+                provider: ai_provider,
+                api_key:  ai_api_key,
+                model:    ai_model || null,
+            },
+        };
+    }
+
     const res = await fetch(`${API_BASE}${path}`, {
         method,
         headers,
-        body: body ? (isFormData ? body : JSON.stringify(body)) : undefined,
+        body: finalBody ? (isFormData ? finalBody : JSON.stringify(finalBody)) : undefined,
     });
 
     if (res.status === 401) {
@@ -155,10 +169,10 @@ async function handleOptimizeResume({ job_desc, jd_cache_id, original_ats_score 
 
 /**
  * UPLOAD_RESUME — fire-and-forget.
- * Popup converts the PDF File to base64, sends it here.
+ * Popup converts the PDF File to base64, sends it here with BYOK fields.
  * We reconstruct the binary blob and POST to /upload-resume.
  */
-async function handleUploadResume({ base64, filename }) {
+async function handleUploadResume({ base64, filename, ai_provider, ai_api_key, ai_model }) {
     await setToStorage({ upload_status: "running", upload_filename: filename });
     notifyPopup({ type: "UPLOAD_PROGRESS" });
 
@@ -171,6 +185,10 @@ async function handleUploadResume({ base64, filename }) {
 
         const formData = new FormData();
         formData.append("file", blob, filename);
+        // Attach BYOK fields as form fields
+        if (ai_provider) formData.append("ai_provider", ai_provider);
+        if (ai_api_key)  formData.append("ai_api_key",  ai_api_key);
+        if (ai_model)    formData.append("ai_model",    ai_model);
 
         await apiFetch("/upload-resume", { isFormData: true, body: formData });
 

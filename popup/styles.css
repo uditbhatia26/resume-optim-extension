@@ -1544,3 +1544,198 @@ body {
     background: var(--accent);
     color: white;
 }
+
+/* ── AI Provider / API Key Section ─────────────────────────────────── */
+
+/* Status bar shown when popup is open in logged-in state */
+.ai-key-status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 16px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    gap: 8px;
+    animation: slideIn 0.25s ease;
+}
+
+.ai-key-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+}
+
+.ai-key-chip.has-key {
+    color: var(--accent);
+}
+
+.ai-key-change-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.ai-key-change-btn:hover {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+/* The form inside the action-section */
+.ai-key-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.ai-key-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ai-key-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+}
+
+.ai-key-optional {
+    font-weight: 400;
+    color: var(--muted2);
+}
+
+.ai-key-select {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='%235a6a85'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.ai-key-select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0, 87, 255, 0.10);
+}
+
+.ai-key-input-row {
+    display: flex;
+    gap: 6px;
+    align-items: stretch;
+}
+
+.ai-key-input {
+    flex: 1;
+    padding: 9px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    font-family: 'Inter', sans-serif;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.ai-key-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0, 87, 255, 0.10);
+}
+
+.ai-key-input::placeholder {
+    color: var(--muted2);
+}
+
+/* Show/hide key toggle */
+.ai-key-toggle-btn {
+    background: var(--surface2);
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 0 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    flex-shrink: 0;
+}
+
+.ai-key-toggle-btn:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+}
+
+.ai-key-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.ai-key-actions .btn {
+    flex: 1;
+}
+
+/* Outline variant for "Test Connection" */
+.btn-outline {
+    background: transparent;
+    border: 1.5px solid var(--accent);
+    color: var(--accent);
+    padding: 9px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.btn-outline:hover {
+    background: var(--accent);
+    color: white;
+}
+
+.btn-outline:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Masked key shown in the saved card */
+.ai-key-masked {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted2);
+    font-family: 'Courier New', monospace;
+    margin-left: 4px;
+}
+
+/* Success message */
+.ai-key-success {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--success);
+    padding: 6px 10px;
+    background: rgba(0, 201, 167, 0.08);
+    border-radius: 6px;
+    border: 1px solid rgba(0, 201, 167, 0.25);
+}
