@@ -520,6 +520,9 @@ async function showMainApp() {
         currentUser?.plan          ?? "free",
     );
 
+    // Render the API key status (BYOK)
+    await renderKeyStatus();
+
     // Remind unverified users to check their inbox
     if (currentUser && !currentUser.email_verified) {
         showUnverifiedBanner();
@@ -565,6 +568,17 @@ function initializeEventListeners() {
 
     const jobDescInput = document.getElementById("jobDescriptionInput");
     if (jobDescInput) jobDescInput.addEventListener("input", handleJobDescriptionInputChange);
+
+    // BYOK / API key handlers
+    document.getElementById("aiKeySaveBtn")?.addEventListener("click", handleSaveApiKey);
+    document.getElementById("aiKeyTestBtn")?.addEventListener("click", handleTestApiKey);
+    document.getElementById("apiKeyToggleBtn")?.addEventListener("click", handleApiKeyToggleVisibility);
+    document.getElementById("aiKeyEditBtn")?.addEventListener("click", handleApiKeyEdit);
+    document.getElementById("aiKeyChangeBtn")?.addEventListener("click", () => {
+        // Scroll the aiKeySection into view
+        document.getElementById("aiKeySection")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        handleApiKeyEdit();
+    });
 }
 
 // ============================
@@ -692,6 +706,8 @@ async function handleSignup(e) {
 
 async function handleLogout() {
     await clearSession();
+    // Also clear the saved API key on logout
+    await chrome.storage.local.remove(["ai_provider", "ai_api_key", "ai_model"]);
     await chrome.storage.local.clear();
     currentUser = null;
     showAuthScreen();
@@ -781,6 +797,144 @@ async function handleGoogleLogin() {
 
 
 // ============================
+// AI Provider / BYOK Handlers
+// ============================
+
+/** Render the saved-key state vs. form state in the aiKeySection. */
+async function renderKeyStatus() {
+    const stored = await getFromStorage(["ai_provider", "ai_api_key", "ai_model"]);
+    const { ai_provider, ai_api_key, ai_model } = stored;
+
+    const savedState = document.getElementById("aiKeySavedState");
+    const formState  = document.getElementById("aiKeyFormState");
+    const provText   = document.getElementById("aiKeyProviderText");
+    const maskedText = document.getElementById("aiKeyMaskedText");
+    const statusBar  = document.getElementById("aiKeyStatusBar");
+    const chipEl     = document.getElementById("aiKeyChip");
+    const chipText   = document.getElementById("aiKeyChipText");
+
+    const PROVIDER_LABELS = {
+        openai: "OpenAI", anthropic: "Anthropic", google: "Google Gemini",
+        groq: "Groq", openrouter: "OpenRouter",
+    };
+
+    if (ai_provider && ai_api_key) {
+        const label = PROVIDER_LABELS[ai_provider] || ai_provider;
+        const masked = ai_api_key.length > 8
+            ? ai_api_key.slice(0, 4) + "…" + ai_api_key.slice(-4)
+            : "****";
+
+        if (savedState) savedState.style.display = "block";
+        if (formState)  formState.style.display  = "none";
+        if (provText)   provText.textContent  = label;
+        if (maskedText) maskedText.textContent = masked;
+
+        if (statusBar) statusBar.style.display = "flex";
+        if (chipEl)    chipEl.classList.add("has-key");
+        if (chipText)  chipText.textContent = `${label} · ${masked}`;
+    } else {
+        if (savedState) savedState.style.display = "none";
+        if (formState)  formState.style.display  = "block";
+
+        if (statusBar) statusBar.style.display = "flex";
+        if (chipEl)    chipEl.classList.remove("has-key");
+        if (chipText)  chipText.textContent = "No API key set";
+    }
+}
+
+async function handleSaveApiKey() {
+    const provider = document.getElementById("providerSelect")?.value?.trim();
+    const apiKey   = document.getElementById("apiKeyInput")?.value?.trim();
+    const model    = document.getElementById("modelInput")?.value?.trim() || null;
+    const errEl    = document.getElementById("aiKeyError");
+    const succEl   = document.getElementById("aiKeySuccess");
+
+    if (errEl)  errEl.textContent = "";
+    if (succEl) { succEl.style.display = "none"; succEl.textContent = ""; }
+
+    if (!provider) { if (errEl) errEl.textContent = "Please select a provider."; return; }
+    if (!apiKey || apiKey.length < 8) {
+        if (errEl) errEl.textContent = "Please enter a valid API key (at least 8 characters).";
+        return;
+    }
+
+    await setToStorage({ ai_provider: provider, ai_api_key: apiKey, ai_model: model || null });
+    if (succEl) { succEl.textContent = "Key saved!"; succEl.style.display = "block"; }
+    setTimeout(() => { if (succEl) succEl.style.display = "none"; }, 2000);
+    await renderKeyStatus();
+}
+
+async function handleTestApiKey() {
+    const provider = document.getElementById("providerSelect")?.value?.trim();
+    const apiKey   = document.getElementById("apiKeyInput")?.value?.trim();
+    const model    = document.getElementById("modelInput")?.value?.trim() || null;
+    const errEl    = document.getElementById("aiKeyError");
+    const succEl   = document.getElementById("aiKeySuccess");
+    const testBtn  = document.getElementById("aiKeyTestBtn");
+
+    if (errEl)  errEl.textContent = "";
+    if (succEl) { succEl.style.display = "none"; succEl.textContent = ""; }
+
+    if (!provider || !apiKey || apiKey.length < 8) {
+        if (errEl) errEl.textContent = "Please fill in provider and API key before testing.";
+        return;
+    }
+
+    if (testBtn) { testBtn.disabled = true; testBtn.textContent = "Testing…"; }
+
+    try {
+        const stored = await getFromStorage(["access_token"]);
+        const res = await fetch(`${API_BASE}/validate-key`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${stored.access_token}`,
+            },
+            body: JSON.stringify({ provider, api_key: apiKey, model: model || null }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw data;
+        if (succEl) {
+            succEl.textContent = `✓ Connection successful! Using ${data.provider} · ${data.model}`;
+            succEl.style.display = "block";
+        }
+    } catch (err) {
+        const msg = err?.detail || err?.message || String(err);
+        if (errEl) errEl.textContent = `Connection failed: ${msg}`;
+    } finally {
+        if (testBtn) { testBtn.disabled = false; testBtn.textContent = "Test Connection"; }
+    }
+}
+
+async function handleApiKeyToggleVisibility() {
+    const input = document.getElementById("apiKeyInput");
+    if (!input) return;
+    input.type = input.type === "password" ? "text" : "password";
+}
+
+async function handleApiKeyEdit() {
+    const savedState = document.getElementById("aiKeySavedState");
+    const formState  = document.getElementById("aiKeyFormState");
+    // Pre-fill form with stored values
+    const stored = await getFromStorage(["ai_provider", "ai_api_key", "ai_model"]);
+    if (stored.ai_provider) {
+        const sel = document.getElementById("providerSelect");
+        if (sel) sel.value = stored.ai_provider;
+    }
+    if (stored.ai_api_key) {
+        const inp = document.getElementById("apiKeyInput");
+        if (inp) inp.value = stored.ai_api_key;
+    }
+    if (stored.ai_model) {
+        const mInp = document.getElementById("modelInput");
+        if (mInp) mInp.value = stored.ai_model;
+    }
+    if (savedState) savedState.style.display = "none";
+    if (formState)  formState.style.display  = "block";
+}
+
+
+// ============================
 // Resume Upload
 // ============================
 function updateResumeUI(hasResume, filename) {
@@ -819,6 +973,30 @@ async function handleResumeUpload(e) {
     // Show uploading state immediately
     showUploadingState(true, file.name);
 
+    // Check that an API key is configured — gate before upload
+    const storedKey = await getFromStorage(["ai_provider", "ai_api_key"]);
+    if (!storedKey.ai_provider || !storedKey.ai_api_key) {
+        showUploadingState(false);
+
+        // Show inline error under the upload button
+        const errEl = document.getElementById("uploadError") || document.getElementById("uploadError2");
+        if (errEl) errEl.textContent = "Set up an AI provider key before uploading.";
+
+        // Scroll to and briefly highlight the AI Provider section
+        const aiSection = document.getElementById("aiKeySection");
+        if (aiSection) {
+            aiSection.scrollIntoView({ behavior: "smooth", block: "start" });
+            aiSection.style.transition = "box-shadow 0.3s ease";
+            aiSection.style.boxShadow = "0 0 0 3px rgba(0, 87, 255, 0.45)";
+            aiSection.style.borderRadius = "var(--radius)";
+            setTimeout(() => {
+                aiSection.style.boxShadow = "";
+            }, 1800);
+        }
+        return;
+    }
+
+
     // Convert PDF to base64 so it crosses the message boundary to the background worker
     const reader = new FileReader();
     reader.onload = async function (evt) {
@@ -832,7 +1010,13 @@ async function handleResumeUpload(e) {
         // Fire-and-forget — background handles the actual POST
         chrome.runtime.sendMessage({
             type: "UPLOAD_RESUME",
-            payload: { base64, filename: file.name },
+            payload: {
+                base64,
+                filename: file.name,
+                ai_provider: storedKey.ai_provider,
+                ai_api_key:  storedKey.ai_api_key,
+                ai_model:    storedKey.ai_model || null,
+            },
         });
 
         // Poll storage every second so we catch the result if the popup is closed
@@ -842,26 +1026,46 @@ async function handleResumeUpload(e) {
     reader.readAsArrayBuffer(file);
 }
 
-/** Show / hide the uploading spinner state on the upload label. */
+/** Show / hide the uploading spinner state.
+ *  Works for both the initial-upload label (#uploadResumeLabel)
+ *  and the "Change" label inside hasResumeState. */
 function showUploadingState(on, filename) {
-    const label = document.getElementById("uploadResumeLabel");
-    if (!label) return;
+    const uploadLabel = document.getElementById("uploadResumeLabel");
+    const hasResumeVisible = document.getElementById("hasResumeState")?.style.display !== "none";
+    // In "has resume" state the Change button is a label inside #hasResumeState
+    const changeLabel = document.querySelector("#hasResumeState label[for='resumeFileInput']");
+    const targetLabel = hasResumeVisible ? (changeLabel || uploadLabel) : (uploadLabel || changeLabel);
+    if (!targetLabel) return;
+
     if (on) {
-        label._originalHTML = label._originalHTML || label.innerHTML;
-        label.innerHTML =
+        targetLabel._originalHTML = targetLabel._originalHTML || targetLabel.innerHTML;
+        targetLabel.innerHTML =
             '<svg class="icon" viewBox="0 0 24 24" fill="currentColor" style="animation:pulse 1s infinite"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>' +
-            (filename ? `Uploading ${filename}…` : "Uploading…");
-    } else if (label._originalHTML) {
-        label.innerHTML = label._originalHTML;
-        label._originalHTML = null;
+            (filename ? `Uploading \u201c${filename}\u201d\u2026` : "Uploading\u2026");
+        targetLabel.style.opacity = "0.75";
+        targetLabel.style.pointerEvents = "none";
+    } else {
+        // Restore whichever label(s) were mutated
+        [uploadLabel, changeLabel].forEach(el => {
+            if (el && el._originalHTML) {
+                el.innerHTML = el._originalHTML;
+                el._originalHTML = null;
+                el.style.opacity = "";
+                el.style.pointerEvents = "";
+            }
+        });
     }
 }
 
 function showUploadError(msg) {
     showUploadingState(false);
+    // Toast is always visible regardless of scroll position or resume state
+    showToast(msg, "error");
+    // Also persist in the inline error div for reference
     const el = document.getElementById("uploadError2") || document.getElementById("uploadError");
     if (el) el.textContent = msg;
 }
+
 
 function handleUploadDone(filename) {
     showUploadingState(false);
@@ -1024,6 +1228,20 @@ async function handleAnalyzeClick() {
     // Guard: resume must be uploaded before analysis can run
     if (!currentUser?.has_resume) {
         showError("Please upload your resume first before analyzing compatibility.");
+        return;
+    }
+
+    // Guard: API key must be configured
+    const keyCheck = await getFromStorage(["ai_provider", "ai_api_key"]);
+    if (!keyCheck.ai_provider || !keyCheck.ai_api_key) {
+        showError("Please set up your AI provider key first.");
+        const aiSection = document.getElementById("aiKeySection");
+        if (aiSection) {
+            aiSection.scrollIntoView({ behavior: "smooth", block: "start" });
+            aiSection.style.transition = "box-shadow 0.3s ease";
+            aiSection.style.boxShadow = "0 0 0 3px rgba(0, 87, 255, 0.45)";
+            setTimeout(() => { aiSection.style.boxShadow = ""; }, 1800);
+        }
         return;
     }
 
@@ -1193,6 +1411,20 @@ function handleAnalyzeError(errMsg) {
  * OPTIMIZE_DONE / OPTIMIZE_ERROR messages pushed by the worker.
  */
 async function handleGenerateClick() {
+    // Guard: API key must be configured
+    const keyCheck = await getFromStorage(["ai_provider", "ai_api_key"]);
+    if (!keyCheck.ai_provider || !keyCheck.ai_api_key) {
+        showError("Please set up your AI provider key first.");
+        const aiSection = document.getElementById("aiKeySection");
+        if (aiSection) {
+            aiSection.scrollIntoView({ behavior: "smooth", block: "start" });
+            aiSection.style.transition = "box-shadow 0.3s ease";
+            aiSection.style.boxShadow = "0 0 0 3px rgba(0, 87, 255, 0.45)";
+            setTimeout(() => { aiSection.style.boxShadow = ""; }, 1800);
+        }
+        return;
+    }
+
     const { session_jd_cache_id, session_ats_score } =
         await getFromStorage(["session_jd_cache_id", "session_ats_score"]);
 
