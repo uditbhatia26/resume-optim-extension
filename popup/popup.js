@@ -525,6 +525,9 @@ async function showMainApp() {
         showUnverifiedBanner();
     }
 
+    // Silently fetch and show history panel if optimizations exist
+    loadHistory(false);
+
     // Auto-probe the active tab for a job description (non-blocking)
     probePageForJD();
 }
@@ -558,6 +561,7 @@ function initializeEventListeners() {
     document.getElementById("recalculateBtn")?.addEventListener("click", handleRecalculateClick);
     document.getElementById("changelogToggle")?.addEventListener("click", handleChangelogToggle);
     document.getElementById("atsToggleBtn")?.addEventListener("click", handleATSToggle);
+    document.getElementById("historyToggle")?.addEventListener("click", handleHistoryToggle);
 
     const jobDescInput = document.getElementById("jobDescriptionInput");
     if (jobDescInput) jobDescInput.addEventListener("input", handleJobDescriptionInputChange);
@@ -1260,6 +1264,9 @@ function handleOptimizeDone(data) {
             block: "start",
         });
     }, 200);
+
+    // Refresh history panel silently with the new optimization
+    loadHistory(false);
 }
 
 function handleOptimizeError(errMsg) {
@@ -1423,7 +1430,7 @@ function showToast(msg, type = "success") {
     const colors = {
         success: "#22c55e",
         error:   "#ef4444",
-        info:    "#8A2BE2",
+        info:    "#0057FF",
     };
     Object.assign(toast.style, {
         position:     "fixed",
@@ -1717,22 +1724,22 @@ function showVerificationPendingScreen(email) {
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
                   height:100%;padding:32px 24px;text-align:center;gap:16px;">
         <div style="font-size:48px;">📬</div>
-        <h2 style="color:#e2e8f0;margin:0;font-size:18px;font-weight:700;">
+        <h2 style="color:var(--text);margin:0;font-size:18px;font-weight:700;">
           Check your inbox
         </h2>
-        <p style="color:#94a3b8;margin:0;line-height:1.6;font-size:13px;max-width:280px;">
+        <p style="color:var(--muted);margin:0;line-height:1.6;font-size:13px;max-width:280px;">
           We've sent a verification link to<br>
-          <strong style="color:#a78bfa;">${email}</strong>.<br><br>
+          <strong style="color:var(--accent);">${email}</strong>.<br><br>
           Click the link in the email to activate your account, then come back and sign in.
         </p>
         <button id="resendVerifyBtn"
-                style="background:transparent;border:1px solid #6c63ff;color:#a78bfa;
-                       border-radius:8px;padding:10px 24px;cursor:pointer;font-size:13px;
-                       margin-top:8px;">
+                style="background:var(--accent);border:none;color:white;
+                       border-radius:var(--radius);padding:10px 24px;cursor:pointer;font-size:13px;
+                       font-weight:600;margin-top:8px;box-shadow:0 2px 8px rgba(0,87,255,0.25);">
           Resend Email
         </button>
         <button id="backToLoginBtn"
-                style="background:transparent;border:none;color:#64748b;
+                style="background:transparent;border:none;color:var(--muted2);
                        cursor:pointer;font-size:12px;text-decoration:underline;">
           Back to Sign In
         </button>
@@ -1757,8 +1764,8 @@ function showUnverifiedBanner() {
     const banner = document.createElement("div");
     banner.id = "unverifiedBanner";
     banner.style.cssText = `
-        background: linear-gradient(135deg, rgba(234,179,8,0.15), rgba(234,179,8,0.05));
-        border: 1px solid rgba(234,179,8,0.3);
+        background: #fffbeb;
+        border: 1px solid #fef3c7;
         border-radius: 8px;
         padding: 10px 14px;
         margin: 0 0 12px;
@@ -1767,13 +1774,13 @@ function showUnverifiedBanner() {
         justify-content: space-between;
         gap: 10px;
         font-size: 12px;
-        color: #fbbf24;
+        color: #b45309;
     `;
     banner.innerHTML = `
         <span>⚠️ Please verify your email to use all features.
           <button id="resendVerifyBannerBtn"
-                  style="background:transparent;border:none;color:#a78bfa;
-                         cursor:pointer;font-size:12px;text-decoration:underline;padding:0;">
+                  style="background:transparent;border:none;color:var(--accent);
+                         cursor:pointer;font-size:12px;text-decoration:underline;padding:0;font-weight:600;">
             Resend
           </button>
         </span>`;
@@ -1808,4 +1815,194 @@ async function handleResendVerification() {
     } finally {
         if (btn) { btn.disabled = false; btn.textContent = btn.id === "resendVerifyBtn" ? "Resend Email" : "Resend"; }
     }
+}
+
+// ============================
+// History Panel Handlers
+// ============================
+
+async function handleHistoryToggle() {
+    const body = document.getElementById("historyBody");
+    const chevron = document.getElementById("historyChevron");
+    const toggle = document.getElementById("historyToggle");
+    const isExpanded = toggle.getAttribute("aria-expanded") === "true";
+
+    if (isExpanded) {
+        body.style.display = "none";
+        chevron.style.transform = "rotate(0deg)";
+        toggle.setAttribute("aria-expanded", "false");
+    } else {
+        body.style.display = "block";
+        chevron.style.transform = "rotate(180deg)";
+        toggle.setAttribute("aria-expanded", "true");
+        // Load and render history on expand
+        await loadHistory(true);
+    }
+}
+
+async function loadHistory(showLoading = false) {
+    const list = document.getElementById("historyList");
+    const countBadge = document.getElementById("historyCount");
+    const panel = document.getElementById("historyPanel");
+
+    if (!list || !countBadge || !panel) return;
+
+    if (showLoading) {
+        list.innerHTML = `<div style="text-align:center;padding:16px;color:var(--muted);font-size:12px;">Loading history...</div>`;
+    }
+
+    try {
+        const { access_token } = await getFromStorage(["access_token"]);
+        if (!access_token) return;
+
+        const res = await fetch(`${API_BASE}/my-optimizations`, {
+            headers: { "Authorization": `Bearer ${access_token}` },
+        });
+
+        if (!res.ok) throw new Error("Failed to fetch history");
+
+        const history = await res.json();
+        
+        // Show panel if we have items
+        if (history && history.length > 0) {
+            panel.style.display = "block";
+            countBadge.textContent = history.length;
+            countBadge.style.display = "inline-flex";
+            
+            // Render items
+            renderHistoryList(history);
+        } else {
+            panel.style.display = "none"; // Hide panel if no history
+            countBadge.style.display = "none";
+        }
+    } catch (err) {
+        console.error("Error loading history:", err);
+        if (list) {
+            list.innerHTML = `<div style="text-align:center;padding:16px;color:var(--danger);font-size:12px;">Failed to load history.</div>`;
+        }
+    }
+}
+
+function renderHistoryList(history) {
+    const list = document.getElementById("historyList");
+    if (!list) return;
+    list.innerHTML = "";
+
+    history.forEach(item => {
+        const div = document.createElement("div");
+        div.className = "history-item";
+        
+        // Calculate date format: e.g. May 28, 2026
+        let dateStr = "";
+        if (item.created_at) {
+            try {
+                const date = new Date(item.created_at);
+                dateStr = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+            } catch (e) {
+                dateStr = item.created_at;
+            }
+        }
+
+        // Score improvement badge
+        const diff = item.score_improvement || (item.optimized_ats_score - item.original_ats_score) || 0;
+        const diffText = diff > 0 ? `+${diff}` : `${diff}`;
+        const diffClass = diff > 0 ? "history-score-up" : "history-score-neutral";
+
+        div.innerHTML = `
+            <div class="history-item-details">
+                <div class="history-item-title" title="${escapeHtml(item.job_title || 'Optimized Resume')}">
+                    ${escapeHtml(item.job_title || 'Optimized Resume')}
+                </div>
+                <div class="history-item-meta">
+                    <span class="history-item-date">${dateStr}</span>
+                    <span class="history-item-scores">
+                        Score: <strong style="color:var(--text);">${item.original_ats_score}%</strong> 
+                        → <strong style="color:var(--accent);">${item.optimized_ats_score}%</strong>
+                        <span class="history-score-badge ${diffClass}">${diffText} pts</span>
+                    </span>
+                </div>
+            </div>
+            <button class="history-download-btn" data-id="${item.id}" title="Download PDF">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+            </button>
+        `;
+        
+        // Add event listener for download
+        div.querySelector(".history-download-btn").addEventListener("click", async function(e) {
+            e.stopPropagation();
+            const recordId = this.getAttribute("data-id");
+            await downloadHistoryPDF(recordId, this);
+        });
+
+        list.appendChild(div);
+    });
+}
+
+async function downloadHistoryPDF(recordId, btnElement) {
+    const originalHTML = btnElement.innerHTML;
+    btnElement.disabled = true;
+    
+    // Show spinner/loading inside the small button
+    btnElement.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;animation:spin 1s linear infinite;">
+            <circle cx="12" cy="12" r="10" stroke-dasharray="16" />
+        </svg>
+    `;
+
+    try {
+        const { access_token } = await getFromStorage(["access_token"]);
+        if (!access_token) return;
+
+        const res = await fetch(`${API_BASE}/my-optimizations/${recordId}/pdf`, {
+            headers: { "Authorization": `Bearer ${access_token}` },
+        });
+
+        if (!res.ok) throw new Error("Failed to download PDF");
+
+        const blob = await res.blob();
+        
+        // Retrieve filename from content-disposition header if available
+        let filename = "optimized_resume.pdf";
+        const disposition = res.headers.get("content-disposition");
+        if (disposition && disposition.indexOf("attachment") !== -1) {
+            const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+            const matches = filenameRegex.exec(disposition);
+            if (matches != null && matches[1]) {
+                filename = matches[1].replace(/['"]/g, '');
+            }
+        }
+
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.style.display = "none";
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        showToast("✅ Downloaded past optimized resume!", "success");
+    } catch (err) {
+        console.error("Error downloading history PDF:", err);
+        showToast("Failed to download PDF. Please try again.", "error");
+    } finally {
+        btnElement.disabled = false;
+        btnElement.innerHTML = originalHTML;
+    }
+}
+
+function escapeHtml(str) {
+    if (!str) return "";
+    return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
