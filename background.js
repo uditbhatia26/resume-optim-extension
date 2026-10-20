@@ -139,16 +139,17 @@ async function handleAnalyzeATS({ job_desc, jd_cache_id }) {
 }
 
 /** OPTIMIZE_RESUME — fire-and-forget */
-async function handleOptimizeResume({ job_desc, jd_cache_id, original_ats_score }) {
+async function handleOptimizeResume({ job_desc, jd_cache_id, original_ats_score, template }) {
     await setToStorage({ optimization_status: "running" });
     notifyPopup({ type: "OPTIMIZE_PROGRESS", step: "started" });
 
     try {
         const data = await apiFetch("/optimize-resume", {
-            body: { job_desc, jd_cache_id, original_ats_score },
+            body: { job_desc, jd_cache_id, original_ats_score, template: template || "jakes_resume" },
         });
         await setToStorage({
             optimization_status: "done",
+            selected_template: data.selected_template || template || "jakes_resume",
             session_optimized_score: data.optimized_score,
             session_improvements: data.improvements_made,
             session_optimized_yaml: data.optimized_resume_yaml,
