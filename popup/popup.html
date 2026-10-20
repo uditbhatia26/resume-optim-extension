@@ -77,6 +77,11 @@
             </div>
             <div class="header-actions">
                 <span id="userEmail" class="user-email"></span>
+                <button class="settings-btn" id="homeBtn" title="Back to Home / New Job" style="display:none;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
+                    </svg>
+                </button>
                 <button class="settings-btn" id="landingBtn" title="Open Dashboard">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M3 3h8v8H3zm0 10h8v8H3zm10-10h8v8h-8zm0 10h8v8h-8z"/>
@@ -366,6 +371,19 @@
 
             <div class="action-section">
                 <div class="section-title">AI Optimization</div>
+
+                <!-- Template Selector -->
+                <div class="template-selector-wrap" style="margin-bottom: 12px;">
+                    <label for="templateSelect" class="template-select-label" style="display:block; font-size:11px; font-weight:600; color:var(--text-secondary); margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;">
+                        Target Template
+                    </label>
+                    <select id="templateSelect" class="template-select" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:12px; font-family:inherit; cursor:pointer;">
+                        <option value="jakes_resume">Jake's Resume (Standard Tech / Clean ATS)</option>
+                        <option value="classic_ivy">Classic Ivy (Corporate / Serif)</option>
+                        <option value="compact_onepage">Compact (Ultra-Dense 1-Page)</option>
+                    </select>
+                </div>
+
                 <button class="btn btn-primary" id="generateBtn" disabled>
                     <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
@@ -388,8 +406,43 @@
                         <polyline points="7 10 12 15 17 10" />
                         <line x1="12" y1="15" x2="12" y2="3" />
                     </svg>
-                    Download Resume
+                    Download Resume (PDF)
                 </button>
+
+                <button class="btn btn-outline" id="downloadTexBtn" disabled style="margin-top: 8px;">
+                    <svg class="icon" viewBox="0 0 24 24" fill="currentColor" style="width:14px; height:14px;">
+                        <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                    </svg>
+                    Download .tex Source (Overleaf)
+                </button>
+
+                <!-- Start Over Button (visible once optimized) -->
+                <button class="btn btn-outline" id="startOverBtn" style="display: none; margin-top: 8px; width: 100%; justify-content: center;">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;">
+                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                        <path d="M3 3v5h5" />
+                    </svg>
+                    ✦ Start New Optimization
+                </button>
+
+                <!-- Post-Download Confirmation Banner -->
+                <div id="downloadSuccessBanner" style="display: none; margin-top: 10px; padding: 12px; background: rgba(0, 201, 167, 0.08); border: 1px solid rgba(0, 201, 167, 0.28); border-radius: 8px; text-align: center;">
+                    <div style="font-size: 13px; font-weight: 700; color: #00c9a7; margin-bottom: 4px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:15px; height:15px;">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        Download Started!
+                    </div>
+                    <div style="font-size: 11px; color: var(--muted); margin-bottom: 8px;">
+                        Resume exported. Ready to tailor for another role?
+                    </div>
+                    <button class="btn btn-primary" id="postDownloadHomeBtn" style="width: 100%; justify-content: center; padding: 8px 12px; font-size: 12px;">
+                        <svg class="icon" viewBox="0 0 24 24" fill="currentColor" style="width: 14px; height: 14px;">
+                            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
+                        </svg>
+                        Back to Home (New Job)
+                    </button>
+                </div>
             </div>
 
             <!-- Task Progress Bar (shown during analyze / generate) -->
@@ -455,6 +508,60 @@
                 </button>
                 <div id="changelogBody" class="changelog-body" style="display:none;">
                     <ul id="changelogList" class="changelog-list"></ul>
+                </div>
+            </div>
+
+            <!-- Explain Changes Button & Drawer Panel -->
+            <button class="btn btn-outline" id="explainChangesBtn" style="display:none; margin-top:8px; margin-bottom:12px; width:100%; justify-content:center; gap:6px;">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                </svg>
+                💡 Why were these changes made?
+            </button>
+
+            <!-- Explanation Panel -->
+            <div id="explanationPanel" style="display:none; margin-top:0; margin-bottom:14px; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 14px; box-shadow:var(--shadow-sm);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid var(--border);">
+                    <span style="font-size:12px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:5px;">
+                        <span>💡</span> Strategic Change Rationale
+                    </span>
+                    <button id="closeExplanationBtn" style="background:none; border:none; color:var(--muted); font-size:14px; cursor:pointer; padding:2px 6px;">✕</button>
+                </div>
+
+                <!-- Loading State -->
+                <div id="explanationLoading" style="display:none; text-align:center; padding:14px; color:var(--muted); font-size:12px;">
+                    <svg class="icon" viewBox="0 0 24 24" fill="currentColor" style="animation: pulse 1s infinite; width:16px; height:16px; margin: 0 auto 6px auto; display:block;">
+                        <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+                    </svg>
+                    Analyzing transformations & strategy…
+                </div>
+
+                <!-- Explanation Content -->
+                <div id="explanationContent" style="display:none; max-height:280px; overflow-y:auto; padding-right:4px;">
+                    <!-- Summary Rationale -->
+                    <div id="expSummaryBox" style="margin-bottom:10px; background:var(--surface2); padding:8px 10px; border-radius:6px; border-left:3px solid var(--accent);">
+                        <div style="font-size:10px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:3px;">🎯 Target Positioning</div>
+                        <div id="expSummaryText" style="font-size:11px; color:var(--text); line-height:1.4;"></div>
+                    </div>
+
+                    <!-- Key Bullet Enhancements -->
+                    <div style="margin-bottom:10px;">
+                        <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">📈 Key Bullet Upgrades</div>
+                        <div id="expBulletsList" style="display:flex; flex-direction:column; gap:8px;"></div>
+                    </div>
+
+                    <!-- Skills Strategy -->
+                    <div id="expSkillsBox" style="margin-bottom:10px;">
+                        <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">🔑 Skills Strategy</div>
+                        <ul id="expSkillsList" style="margin:0; padding-left:16px; font-size:11px; color:var(--text); line-height:1.45;"></ul>
+                    </div>
+
+                    <!-- Preservation Note -->
+                    <div id="expPreservationBox" style="font-size:10.5px; color:#10a37f; background:rgba(16,163,127,0.08); border:1px solid rgba(16,163,127,0.25); border-radius:6px; padding:6px 8px; line-height:1.4;">
+                        🛡️ <span id="expPreservationText"></span>
+                    </div>
                 </div>
             </div>
 

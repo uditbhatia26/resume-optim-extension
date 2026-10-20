@@ -80,6 +80,7 @@ async function restoreSession() {
         "analyze_status", "analyze_error",
         "upload_status", "upload_error", "upload_filename",
         "session_resume_changes",
+        "selected_template",
         "daily_usage", "monthly_usage", "weekly_usage", "weekly_limit",
     ]);
 
@@ -97,6 +98,9 @@ async function restoreSession() {
     // Restore job description
     jobDescriptionFull = s.session_jd;
     displayJobDescription();
+    if (s.selected_template && document.getElementById("templateSelect")) {
+        document.getElementById("templateSelect").value = s.selected_template;
+    }
     document.querySelector(".input-section").style.display = "none";
     updateProgress(1);
 
@@ -145,6 +149,17 @@ async function restoreSession() {
     if (s.session_optimized_yaml) {
         const dlBtn = document.getElementById("downloadBtn");
         if (dlBtn) { dlBtn.style.display = "inline-flex"; dlBtn.disabled = false; }
+        const texBtn = document.getElementById("downloadTexBtn");
+        if (texBtn) { texBtn.style.display = "inline-flex"; texBtn.disabled = false; }
+        const startOverBtn = document.getElementById("startOverBtn");
+        if (startOverBtn) { startOverBtn.style.display = "inline-flex"; }
+        const explainBtn = document.getElementById("explainChangesBtn");
+        if (explainBtn) { explainBtn.style.display = "inline-flex"; }
+    }
+
+    if (s.session_jd) {
+        const homeBtn = document.getElementById("homeBtn");
+        if (homeBtn) { homeBtn.style.display = "inline-flex"; }
     }
 }
 
@@ -561,6 +576,18 @@ function initializeEventListeners() {
     document.getElementById("generateBtn")?.addEventListener("click", handleGenerateClick);
     document.getElementById("previewBtn")?.addEventListener("click", handlePreviewClick);
     document.getElementById("downloadBtn")?.addEventListener("click", handleDownloadClick);
+    document.getElementById("downloadTexBtn")?.addEventListener("click", handleDownloadTexClick);
+    document.getElementById("homeBtn")?.addEventListener("click", handleResetToHome);
+    document.getElementById("startOverBtn")?.addEventListener("click", handleResetToHome);
+    document.getElementById("postDownloadHomeBtn")?.addEventListener("click", handleResetToHome);
+    document.getElementById("explainChangesBtn")?.addEventListener("click", handleExplainChangesClick);
+    document.getElementById("closeExplanationBtn")?.addEventListener("click", () => {
+        const panel = document.getElementById("explanationPanel");
+        if (panel) panel.style.display = "none";
+    });
+    document.getElementById("templateSelect")?.addEventListener("change", (e) => {
+        setToStorage({ selected_template: e.target.value });
+    });
     document.getElementById("recalculateBtn")?.addEventListener("click", handleRecalculateClick);
     document.getElementById("changelogToggle")?.addEventListener("click", handleChangelogToggle);
     document.getElementById("atsToggleBtn")?.addEventListener("click", handleATSToggle);
@@ -1144,53 +1171,120 @@ function displayJobDescription() {
     jobDescription.textContent = jobDescriptionFull.substring(0, 200) + "...";
     jobContainer.style.display = "block";
     jobContainer.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    const homeBtn = document.getElementById("homeBtn");
+    if (homeBtn) homeBtn.style.display = "inline-flex";
+}
+
+/**
+ * Reset extension back to initial "Home" state:
+ * clears loaded job description, optimization scores, changelog,
+ * and resets progress so user can paste or fetch a new job description.
+ */
+async function handleResetToHome() {
+    // 1. Clear in-memory state
+    jobDescriptionFull = "";
+    isExpanded = false;
+    _pageJDCache = null;
+
+    // 2. Stop running pollers & progress
+    stopAnalyzePoller();
+    stopResultPoller();
+    TaskProgress.stop();
+
+    // 3. Clear session storage (retaining user auth and preferences)
+    await chrome.storage.local.remove([
+        "session_jd", "session_jd_cache_id",
+        "session_ats_score", "session_ats_breakdown",
+        "session_optimized_score", "session_improvements",
+        "session_optimized_yaml", "session_progress",
+        "session_resume_changes", "session_explanation",
+        "optimization_status", "optimization_error",
+        "analyze_status", "analyze_error",
+    ]);
+    _cachedExplanation = null;
+
+    // 4. Hide JD card, show input area again
+    const jobContainer = document.getElementById("jobContainer");
+    if (jobContainer) jobContainer.style.display = "none";
+
+    const inputSection = document.querySelector(".input-section");
+    if (inputSection) inputSection.style.display = "block";
+
+    const jdInput = document.getElementById("jobDescriptionInput");
+    if (jdInput) jdInput.value = "";
+
+    // 5. Reset score displays & breakdown
+    const origScore = document.getElementById("originalScore");
+    if (origScore) origScore.textContent = "--";
+
+    const optSection = document.getElementById("optimizedScoreSection");
+    if (optSection) optSection.style.display = "none";
+
+    const atsBreakdown = document.getElementById("atsBreakdownCard");
+    if (atsBreakdown) atsBreakdown.style.display = "none";
+
+    const changelogPanel = document.getElementById("changelogPanel");
+    if (changelogPanel) changelogPanel.style.display = "none";
+
+    const banner = document.getElementById("downloadSuccessBanner");
+    if (banner) banner.style.display = "none";
+
+    // 6. Lock downstream buttons
+    const analyzeBtn = document.getElementById("analyzeBtn");
+    if (analyzeBtn) analyzeBtn.disabled = true;
+
+    const generateBtn = document.getElementById("generateBtn");
+    if (generateBtn) {
+        generateBtn.disabled = true;
+        setGenerateButtonRunning(false);
+    }
+
+    const previewBtn = document.getElementById("previewBtn");
+    if (previewBtn) previewBtn.disabled = true;
+
+    const downloadBtn = document.getElementById("downloadBtn");
+    if (downloadBtn) {
+        downloadBtn.disabled = true;
+        downloadBtn.style.display = "none";
+    }
+
+    const texBtnReset = document.getElementById("downloadTexBtn");
+    if (texBtnReset) {
+        texBtnReset.disabled = true;
+        texBtnReset.style.display = "none";
+    }
+
+    const startOverBtn = document.getElementById("startOverBtn");
+    if (startOverBtn) startOverBtn.style.display = "none";
+
+    const explainBtn = document.getElementById("explainChangesBtn");
+    if (explainBtn) explainBtn.style.display = "none";
+
+    const expPanel = document.getElementById("explanationPanel");
+    if (expPanel) expPanel.style.display = "none";
+
+    const homeBtn = document.getElementById("homeBtn");
+    if (homeBtn) homeBtn.style.display = "none";
+
+    // 7. Reset progress steps
+    resetProgress();
+
+    // 8. Re-probe the page so the fetch bar comes back if still on a job listing
+    probePageForJD();
+
+    // 9. Scroll smoothly to top
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    const mainContent = document.querySelector(".main-content");
+    if (mainContent) mainContent.scrollTo({ top: 0, behavior: "smooth" });
+
+    showToast("Ready for your next application! 🚀", "info");
 }
 
 /**
  * Remove the loaded job description and reset all downstream state.
  */
 async function handleRemoveJobClick() {
-    // Clear in-memory state
-    jobDescriptionFull = "";
-    isExpanded = false;
-    _pageJDCache = null;
-
-    // Clear persisted session
-    await chrome.storage.local.remove([
-        "session_jd", "session_jd_cache_id",
-        "session_ats_score", "session_optimized_score",
-        "session_improvements", "session_optimized_yaml",
-        "session_progress", "optimization_status",
-        "optimization_error", "analyze_status",
-        "analyze_error",
-    ]);
-
-    // Hide JD card, show input area again
-    document.getElementById("jobContainer").style.display = "none";
-    document.querySelector(".input-section").style.display = "block";
-    document.getElementById("jobDescriptionInput").value = "";
-
-    // Reset score display
-    document.getElementById("originalScore").textContent = "--";
-
-    // Lock downstream buttons
-    document.getElementById("analyzeBtn").disabled = true;
-    document.getElementById("generateBtn").disabled = true;
-    document.getElementById("previewBtn").disabled = true;
-    document.getElementById("downloadBtn").disabled = true;
-    document.getElementById("downloadBtn").style.display = "none";
-
-    // Hide optimized results section if visible
-    const optSection = document.getElementById("optimizedScoreSection");
-    if (optSection) optSection.style.display = "none";
-
-    // Stop any running pollers
-    stopAnalyzePoller();
-    stopResultPoller();
-    TaskProgress.stop();
-
-    // Re-probe the page so the fetch bar comes back if still on a job listing
-    probePageForJD();
+    await handleResetToHome();
 }
 
 function handleReadMoreClick() {
@@ -1432,6 +1526,10 @@ async function handleGenerateClick() {
     await saveSession({ optimization_status: "running" });
     TaskProgress.start("Generating optimized resume", 40_000);
 
+    const templateSelect = document.getElementById("templateSelect");
+    const selectedTemplate = templateSelect ? templateSelect.value : "jakes_resume";
+    await setToStorage({ selected_template: selectedTemplate });
+
     // Fire-and-forget — background manages the 30-second request
     chrome.runtime.sendMessage({
         type: "OPTIMIZE_RESUME",
@@ -1439,6 +1537,7 @@ async function handleGenerateClick() {
             job_desc: jobDescriptionFull,
             jd_cache_id: session_jd_cache_id || null,
             original_ats_score: session_ats_score || null,
+            template: selectedTemplate,
         },
     });
 
@@ -1488,6 +1587,15 @@ function handleOptimizeDone(data) {
     document.getElementById("previewBtn").style.display = "none";
     document.getElementById("downloadBtn").style.display = "inline-flex";
     document.getElementById("downloadBtn").disabled = false;
+    const dlTex = document.getElementById("downloadTexBtn");
+    if (dlTex) { dlTex.style.display = "inline-flex"; dlTex.disabled = false; }
+    const startOver = document.getElementById("startOverBtn");
+    if (startOver) { startOver.style.display = "inline-flex"; }
+    const homeBtn = document.getElementById("homeBtn");
+    if (homeBtn) { homeBtn.style.display = "inline-flex"; }
+    const explainBtn = document.getElementById("explainChangesBtn");
+    if (explainBtn) { explainBtn.style.display = "inline-flex"; }
+    _cachedExplanation = null;
     updateProgress(5);
 
     setTimeout(() => {
@@ -1523,10 +1631,15 @@ async function handleDownloadClick() {
 
         if (!access_token) { await handleLogout(); return; }
 
+        const templateSelect = document.getElementById("templateSelect");
+        const template = templateSelect ? templateSelect.value : "jakes_resume";
+
         // Send the optimized YAML if available; backend falls back to base resume
-        const body = session_optimized_yaml
-            ? JSON.stringify({ resume_yaml: session_optimized_yaml })
-            : "{}";
+        const body = JSON.stringify({
+            resume_yaml: session_optimized_yaml || undefined,
+            template: template,
+            return_tex: false,
+        });
 
         const res = await fetch(`${API_BASE}/generate-pdf`, {
             method: "POST",
@@ -1554,8 +1667,80 @@ async function handleDownloadClick() {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
 
+        // Show post-download completion banner
+        const banner = document.getElementById("downloadSuccessBanner");
+        if (banner) {
+            banner.style.display = "block";
+            banner.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+        showToast("PDF downloaded! Click 'Back to Home' when ready for the next job.", "success");
+
     } catch (err) {
         showError("Download failed: " + (err.message || String(err)));
+    } finally {
+        btn.innerHTML = originalHTML;
+        btn.disabled = false;
+    }
+}
+
+
+async function handleDownloadTexClick() {
+    const btn = document.getElementById("downloadTexBtn");
+    if (!btn) return;
+    const originalHTML = btn.innerHTML;
+    btn.disabled = true;
+    showLoadingState(btn, "Generating .tex…");
+
+    try {
+        const { access_token, session_optimized_yaml } =
+            await getFromStorage(["access_token", "session_optimized_yaml"]);
+
+        if (!access_token) { await handleLogout(); return; }
+
+        const templateSelect = document.getElementById("templateSelect");
+        const template = templateSelect ? templateSelect.value : "jakes_resume";
+
+        const body = JSON.stringify({
+            resume_yaml: session_optimized_yaml || undefined,
+            template: template,
+            return_tex: true,
+        });
+
+        const res = await fetch(`${API_BASE}/generate-pdf`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${access_token}`,
+            },
+            body,
+        });
+
+        if (res.status === 401) { await handleLogout(); return; }
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || "LaTeX export failed.");
+        }
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "optimized_resume.tex";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        // Show post-download completion banner
+        const banner = document.getElementById("downloadSuccessBanner");
+        if (banner) {
+            banner.style.display = "block";
+            banner.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+        showToast(".tex file downloaded! Click 'Back to Home' when ready for the next job.", "success");
+
+    } catch (err) {
+        showError("LaTeX download failed: " + (err.message || String(err)));
     } finally {
         btn.innerHTML = originalHTML;
         btn.disabled = false;
@@ -1735,6 +1920,19 @@ function showOptimizedScoreSection({ originalScore, optimizedScore, improvements
     setTimeout(() => {
         section.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }, 100);
+}
+
+function resetProgress() {
+    for (let i = 1; i <= 5; i++) {
+        const stepIcon = document.getElementById(`step${i}`);
+        if (stepIcon) {
+            const stepItem = stepIcon.parentElement;
+            stepIcon.classList.remove("completed");
+            stepIcon.classList.add("pending");
+            stepIcon.innerHTML = `${i}`;
+            stepItem.classList.remove("completed");
+        }
+    }
 }
 
 function updateProgress(step) {
@@ -1934,6 +2132,165 @@ function handleChangelogToggle() {
     const isOpen = body.style.display !== "none";
     body.style.display = isOpen ? "none" : "block";
     toggle.classList.toggle("open", !isOpen);
+}
+
+// ============================
+// AI Change Explanations UI
+// ============================
+
+let _cachedExplanation = null;
+
+async function handleExplainChangesClick() {
+    const panel = document.getElementById("explanationPanel");
+    const loading = document.getElementById("explanationLoading");
+    const content = document.getElementById("explanationContent");
+    if (!panel) return;
+
+    // Toggle close if already open and content is visible
+    if (panel.style.display !== "none" && content && content.style.display !== "none") {
+        panel.style.display = "none";
+        return;
+    }
+
+    panel.style.display = "block";
+
+    if (_cachedExplanation) {
+        renderExplanation(_cachedExplanation);
+        return;
+    }
+
+    const { session_explanation, session_optimized_yaml, access_token } =
+        await getFromStorage(["session_explanation", "session_optimized_yaml", "access_token"]);
+
+    if (session_explanation) {
+        _cachedExplanation = session_explanation;
+        renderExplanation(session_explanation);
+        return;
+    }
+
+    if (!session_optimized_yaml) {
+        showError("Please optimize a resume first.");
+        panel.style.display = "none";
+        return;
+    }
+
+    loading.style.display = "block";
+    content.style.display = "none";
+
+    try {
+        const storedKey = await getFromStorage(["ai_provider", "api_key", "ai_model"]);
+        const aiConfig = storedKey.ai_provider && storedKey.api_key ? {
+            provider: storedKey.ai_provider,
+            api_key: storedKey.api_key,
+            model: storedKey.ai_model || null,
+        } : null;
+
+        const res = await fetch(`${API_BASE}/explain-changes`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${access_token}`,
+            },
+            body: JSON.stringify({
+                optimized_yaml: session_optimized_yaml,
+                job_description: jobDescriptionFull || "",
+                ai_config: aiConfig,
+            }),
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || "Failed to generate change explanation");
+        }
+
+        const data = await res.json();
+        _cachedExplanation = data;
+        await setToStorage({ session_explanation: data });
+        renderExplanation(data);
+
+    } catch (e) {
+        loading.style.display = "none";
+        showError("Could not explain changes: " + (e.message || String(e)));
+        panel.style.display = "none";
+    }
+}
+
+function renderExplanation(data) {
+    const loading = document.getElementById("explanationLoading");
+    const content = document.getElementById("explanationContent");
+    if (!content) return;
+
+    if (loading) loading.style.display = "none";
+    content.style.display = "block";
+
+    // 1. Summary
+    const summaryBox = document.getElementById("expSummaryBox");
+    const summaryText = document.getElementById("expSummaryText");
+    if (data.summary_rationale) {
+        summaryText.textContent = data.summary_rationale;
+        summaryBox.style.display = "block";
+    } else {
+        summaryBox.style.display = "none";
+    }
+
+    // 2. Bullets
+    const bulletsList = document.getElementById("expBulletsList");
+    bulletsList.innerHTML = "";
+    const enhancements = data.key_enhancements || [];
+    if (enhancements.length > 0) {
+        enhancements.forEach(item => {
+            const card = document.createElement("div");
+            card.style.cssText = "background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:8px 10px; font-size:11px;";
+
+            const secTitle = document.createElement("div");
+            secTitle.style.cssText = "font-weight:700; color:var(--text); margin-bottom:4px; font-size:11px;";
+            secTitle.textContent = item.section || "Role Enhancement";
+            card.appendChild(secTitle);
+
+            if (item.original) {
+                const origDiv = document.createElement("div");
+                origDiv.style.cssText = "color:var(--muted); text-decoration:line-through; margin-bottom:3px; opacity:0.8; font-size:10.5px;";
+                origDiv.textContent = item.original;
+                card.appendChild(origDiv);
+            }
+
+            const optDiv = document.createElement("div");
+            optDiv.style.cssText = "color:#0057FF; font-weight:600; margin-bottom:4px; font-size:11px;";
+            optDiv.textContent = item.optimized;
+            card.appendChild(optDiv);
+
+            if (item.reason) {
+                const reasonDiv = document.createElement("div");
+                reasonDiv.style.cssText = "font-size:10px; color:var(--muted); font-style:italic; background:var(--surface); padding:4px 6px; border-radius:4px; border:1px solid rgba(0,0,0,0.04);";
+                reasonDiv.textContent = `💡 ${item.reason}`;
+                card.appendChild(reasonDiv);
+            }
+
+            bulletsList.appendChild(card);
+        });
+    } else {
+        bulletsList.innerHTML = "<div style='font-size:11px; color:var(--muted);'>All bullets aligned with role criteria.</div>";
+    }
+
+    // 3. Skills
+    const skillsList = document.getElementById("expSkillsList");
+    skillsList.innerHTML = "";
+    (data.skills_strategy || []).forEach(strat => {
+        const li = document.createElement("li");
+        li.textContent = strat;
+        skillsList.appendChild(li);
+    });
+
+    // 4. Preservation
+    const presText = document.getElementById("expPreservationText");
+    if (presText) {
+        presText.textContent = data.preservation_notes || "All education, roles, and factual history were preserved verbatim.";
+    }
+
+    const panel = document.getElementById("explanationPanel");
+    if (panel) {
+        panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
 }
 
 
