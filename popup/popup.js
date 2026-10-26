@@ -2254,10 +2254,10 @@ async function handleExplainChangesClick() {
     content.style.display = "none";
 
     try {
-        const storedKey = await getFromStorage(["ai_provider", "api_key", "ai_model"]);
-        const aiConfig = storedKey.ai_provider && storedKey.api_key ? {
+        const storedKey = await getFromStorage(["ai_provider", "ai_api_key", "ai_model", "is_byok_allowed"]);
+        const aiConfig = storedKey.is_byok_allowed && storedKey.ai_provider && storedKey.ai_api_key ? {
             provider: storedKey.ai_provider,
-            api_key: storedKey.api_key,
+            api_key: storedKey.ai_api_key,
             model: storedKey.ai_model || null,
         } : null;
 
