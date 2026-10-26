@@ -346,11 +346,11 @@ document.addEventListener("DOMContentLoaded", async function () {
 async function checkAuthStatus() {
     const {
         access_token, user_email, has_resume, resume_filename,
-        email_verified,
+        email_verified, is_byok_allowed, is_admin,
         weekly_usage, weekly_limit, daily_usage, monthly_usage, plan,
     } = await getFromStorage([
         "access_token", "user_email", "has_resume", "resume_filename",
-        "email_verified",
+        "email_verified", "is_byok_allowed", "is_admin",
         "weekly_usage", "weekly_limit", "daily_usage", "monthly_usage", "plan",
     ]);
 
@@ -364,6 +364,8 @@ async function checkAuthStatus() {
         has_resume:     !!has_resume,
         resume_filename,
         email_verified: email_verified ?? true,
+        is_byok_allowed: !!is_byok_allowed,
+        is_admin:       !!is_admin,
         plan:           plan ?? "free",
         weekly_usage:   weekly_usage  ?? 0,
         weekly_limit:   weekly_limit  ?? 5,
@@ -375,26 +377,33 @@ async function checkAuthStatus() {
     // Silently refresh the token if it expires within 24 hours
     tryRefreshToken(access_token);
 
-    // If storage says unverified, silently re-check the DB.
-    // The user may have clicked the verification link since last popup open.
-    if (email_verified === false) {
-        try {
-            const res = await fetch(`${API_BASE}/auth/me`, {
-                headers: { "Authorization": `Bearer ${access_token}` },
+    // Re-check profile to keep entitlement and verification up to date
+    try {
+        const res = await fetch(`${API_BASE}/auth/me`, {
+            headers: { "Authorization": `Bearer ${access_token}` },
+        });
+        if (res.ok) {
+            const data = await res.json();
+            currentUser.email_verified = data.email_verified;
+            currentUser.is_byok_allowed = data.is_byok_allowed ?? false;
+            currentUser.is_admin = data.is_admin ?? false;
+            currentUser.plan = data.plan;
+            currentUser.weekly_usage = data.weekly_usage;
+            currentUser.weekly_limit = data.weekly_limit;
+            await setToStorage({
+                email_verified: data.email_verified,
+                is_byok_allowed: data.is_byok_allowed ?? false,
+                is_admin: data.is_admin ?? false,
+                plan: data.plan,
+                weekly_usage: data.weekly_usage,
+                weekly_limit: data.weekly_limit,
             });
-            if (res.ok) {
-                const data = await res.json();
-                if (data.email_verified) {
-                    // DB says verified now — update storage and refresh UI
-                    currentUser.email_verified = true;
-                    await setToStorage({ email_verified: true });
-                    const banner = document.getElementById("unverifiedBanner");
-                    if (banner) banner.remove();
-                }
-            }
-        } catch {
-            // Network error — ignore, banner stays until next successful check
+            const banner = document.getElementById("unverifiedBanner");
+            if (banner && data.email_verified) banner.remove();
+            renderKeyStatus();
         }
+    } catch {
+        // Network error — ignore
     }
 }
 
@@ -437,6 +446,8 @@ async function tryRefreshToken(currentToken) {
             has_resume:    data.has_resume,
             resume_filename: data.resume_filename,
             email_verified: data.email_verified,
+            is_byok_allowed: data.is_byok_allowed ?? false,
+            is_admin:      data.is_admin ?? false,
             weekly_usage:  data.weekly_usage,
             weekly_limit:  data.weekly_limit,
             daily_usage:   data.daily_usage,
@@ -444,11 +455,14 @@ async function tryRefreshToken(currentToken) {
         });
         // Update in-memory currentUser with refreshed data
         currentUser.plan           = data.plan;
+        currentUser.is_byok_allowed = data.is_byok_allowed ?? false;
+        currentUser.is_admin        = data.is_admin ?? false;
         currentUser.weekly_usage   = data.weekly_usage;
         currentUser.weekly_limit   = data.weekly_limit;
         currentUser.daily_usage    = data.daily_usage;
         currentUser.monthly_usage  = data.monthly_usage;
         currentUser.email_verified = data.email_verified;
+        renderKeyStatus();
     } catch {
         // Network error — ignore, current token still works until expiry
     }
@@ -653,6 +667,8 @@ async function handleLogin(e) {
             resume_filename: data.resume_filename || null,
             plan: data.plan,
             email_verified: data.email_verified,
+            is_byok_allowed: data.is_byok_allowed ?? false,
+            is_admin: data.is_admin ?? false,
             weekly_usage: data.weekly_usage,
             weekly_limit: data.weekly_limit,
             daily_usage: data.daily_usage,
@@ -662,7 +678,10 @@ async function handleLogin(e) {
             email: data.email,
             has_resume: data.has_resume,
             resume_filename: data.resume_filename || null,
+            plan: data.plan,
             email_verified: data.email_verified,
+            is_byok_allowed: data.is_byok_allowed ?? false,
+            is_admin: data.is_admin ?? false,
             weekly_usage: data.weekly_usage,
             weekly_limit: data.weekly_limit,
             daily_usage: data.daily_usage,
@@ -707,6 +726,8 @@ async function handleSignup(e) {
             has_resume: data.has_resume,
             resume_filename: data.resume_filename || null,
             email_verified: data.email_verified,
+            is_byok_allowed: data.is_byok_allowed ?? false,
+            is_admin: data.is_admin ?? false,
             weekly_usage: data.weekly_usage,
             weekly_limit: data.weekly_limit,
             daily_usage: data.daily_usage,
@@ -717,6 +738,8 @@ async function handleSignup(e) {
             has_resume: data.has_resume,
             resume_filename: data.resume_filename || null,
             email_verified: data.email_verified,
+            is_byok_allowed: data.is_byok_allowed ?? false,
+            is_admin: data.is_admin ?? false,
             weekly_usage: data.weekly_usage,
             weekly_limit: data.weekly_limit,
             daily_usage: data.daily_usage,
@@ -829,6 +852,36 @@ async function handleGoogleLogin() {
 
 /** Render the saved-key state vs. form state in the aiKeySection. */
 async function renderKeyStatus() {
+    const aiSection = document.getElementById("aiKeySection");
+    const statusBar  = document.getElementById("aiKeyStatusBar");
+    const chipEl     = document.getElementById("aiKeyChip");
+    const chipText   = document.getElementById("aiKeyChipText");
+
+    const isByokAllowed = !!currentUser?.is_byok_allowed;
+
+    if (!isByokAllowed) {
+        // Standard user: Server-managed AI active, hide custom key drawer
+        if (aiSection) aiSection.style.display = "none";
+        if (statusBar) statusBar.style.display = "flex";
+        const changeBtn = document.getElementById("aiKeyChangeBtn");
+        if (changeBtn) changeBtn.style.display = "none";
+        if (chipEl) {
+            chipEl.classList.remove("has-key");
+            chipEl.classList.add("server-ai");
+        }
+        const planName = (currentUser?.plan || "free").toUpperCase();
+        const used = currentUser?.weekly_usage ?? 0;
+        const limit = currentUser?.weekly_limit ?? 5;
+        if (chipText) {
+            chipText.textContent = `Server AI (${planName} · ${used}/${limit}/wk)`;
+        }
+        return;
+    }
+
+    // BYOK-entitled user: show custom key drawer & status
+    if (aiSection) aiSection.style.display = "block";
+    const changeBtn = document.getElementById("aiKeyChangeBtn");
+    if (changeBtn) changeBtn.style.display = "";
     const stored = await getFromStorage(["ai_provider", "ai_api_key", "ai_model"]);
     const { ai_provider, ai_api_key, ai_model } = stored;
 
@@ -836,9 +889,6 @@ async function renderKeyStatus() {
     const formState  = document.getElementById("aiKeyFormState");
     const provText   = document.getElementById("aiKeyProviderText");
     const maskedText = document.getElementById("aiKeyMaskedText");
-    const statusBar  = document.getElementById("aiKeyStatusBar");
-    const chipEl     = document.getElementById("aiKeyChip");
-    const chipText   = document.getElementById("aiKeyChipText");
 
     const PROVIDER_LABELS = {
         openai: "OpenAI", anthropic: "Anthropic", google: "Google Gemini",
@@ -857,17 +907,24 @@ async function renderKeyStatus() {
         if (maskedText) maskedText.textContent = masked;
 
         if (statusBar) statusBar.style.display = "flex";
-        if (chipEl)    chipEl.classList.add("has-key");
-        if (chipText)  chipText.textContent = `${label} · ${masked}`;
+        if (chipEl) {
+            chipEl.classList.remove("server-ai");
+            chipEl.classList.add("has-key");
+        }
+        if (chipText)  chipText.textContent = `BYOK Active · ${label} (${masked})`;
     } else {
         if (savedState) savedState.style.display = "none";
         if (formState)  formState.style.display  = "block";
 
         if (statusBar) statusBar.style.display = "flex";
-        if (chipEl)    chipEl.classList.remove("has-key");
-        if (chipText)  chipText.textContent = "No API key set";
+        if (chipEl) {
+            chipEl.classList.remove("server-ai");
+            chipEl.classList.remove("has-key");
+        }
+        if (chipText)  chipText.textContent = "BYOK Enabled (No API key set)";
     }
 }
+
 
 async function handleSaveApiKey() {
     const provider = document.getElementById("providerSelect")?.value?.trim();
@@ -1000,9 +1057,9 @@ async function handleResumeUpload(e) {
     // Show uploading state immediately
     showUploadingState(true, file.name);
 
-    // Check that an API key is configured — gate before upload
+    // Check that an API key is configured — gate before upload only if user has BYOK entitlement
     const storedKey = await getFromStorage(["ai_provider", "ai_api_key"]);
-    if (!storedKey.ai_provider || !storedKey.ai_api_key) {
+    if (currentUser?.is_byok_allowed && (!storedKey.ai_provider || !storedKey.ai_api_key)) {
         showUploadingState(false);
 
         // Show inline error under the upload button
@@ -1325,9 +1382,9 @@ async function handleAnalyzeClick() {
         return;
     }
 
-    // Guard: API key must be configured
+    // Guard: API key must be configured if user has BYOK entitlement
     const keyCheck = await getFromStorage(["ai_provider", "ai_api_key"]);
-    if (!keyCheck.ai_provider || !keyCheck.ai_api_key) {
+    if (currentUser?.is_byok_allowed && (!keyCheck.ai_provider || !keyCheck.ai_api_key)) {
         showError("Please set up your AI provider key first.");
         const aiSection = document.getElementById("aiKeySection");
         if (aiSection) {
@@ -1505,9 +1562,9 @@ function handleAnalyzeError(errMsg) {
  * OPTIMIZE_DONE / OPTIMIZE_ERROR messages pushed by the worker.
  */
 async function handleGenerateClick() {
-    // Guard: API key must be configured
+    // Guard: API key must be configured if user has BYOK entitlement
     const keyCheck = await getFromStorage(["ai_provider", "ai_api_key"]);
-    if (!keyCheck.ai_provider || !keyCheck.ai_api_key) {
+    if (currentUser?.is_byok_allowed && (!keyCheck.ai_provider || !keyCheck.ai_api_key)) {
         showError("Please set up your AI provider key first.");
         const aiSection = document.getElementById("aiKeySection");
         if (aiSection) {
