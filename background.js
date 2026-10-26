@@ -26,24 +26,31 @@ function notifyPopup(message) {
 
 // ---- Generic authenticated fetch ----
 async function apiFetch(path, { method = "POST", body = null, isFormData = false } = {}) {
-    const stored = await getFromStorage(["access_token", "ai_provider", "ai_api_key", "ai_model"]);
-    const { access_token, ai_provider, ai_api_key, ai_model } = stored;
+    const stored = await getFromStorage(["access_token", "ai_provider", "ai_api_key", "ai_model", "is_byok_allowed"]);
+    const { access_token, ai_provider, ai_api_key, ai_model, is_byok_allowed } = stored;
     if (!access_token) throw new Error("Not authenticated");
 
     const headers = { Authorization: `Bearer ${access_token}` };
     if (!isFormData) headers["Content-Type"] = "application/json";
 
-    // Attach BYOK config to JSON bodies (FormData endpoints handle it separately)
+    // Attach BYOK config to JSON bodies only if user is entitled and has credentials saved
     let finalBody = body;
-    if (!isFormData && body && typeof body === "object" && ai_provider && ai_api_key) {
-        finalBody = {
-            ...body,
-            ai_config: {
-                provider: ai_provider,
-                api_key:  ai_api_key,
-                model:    ai_model || null,
-            },
-        };
+    if (!isFormData && body && typeof body === "object") {
+        if (is_byok_allowed && ai_provider && ai_api_key) {
+            finalBody = {
+                ...body,
+                ai_config: {
+                    provider: ai_provider,
+                    api_key:  ai_api_key,
+                    model:    ai_model || null,
+                },
+            };
+        } else {
+            finalBody = {
+                ...body,
+                ai_config: null,
+            };
+        }
     }
 
     const res = await fetch(`${API_BASE}${path}`, {
