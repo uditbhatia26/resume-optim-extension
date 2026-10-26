@@ -3,9 +3,10 @@
 // Owns all long-running API calls so they survive a closed popup.
 // ============================================================
 
-// ⚠️ Swap to production URL before deploying to Chrome Web Store
-const CONFIG = { API_BASE: "http://localhost:8000" };
-const API_BASE = CONFIG.API_BASE;
+importScripts("config.js"); // defines SCULPT_CONFIG
+const API_BASE = SCULPT_CONFIG.API_BASE;
+const MAX_JD_CHARS = 10000; // keep in sync with MAX_JD_CHARS in backend/schema/schema.py
+const clampJD = (t) => (t || "").slice(0, MAX_JD_CHARS);
 
 // ---- Storage helpers ----
 function getFromStorage(keys) {
@@ -119,7 +120,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 /** PARSE_JD — cache-warming, request-response (fast, <1s) */
 async function handleParseJD({ job_desc }) {
-    const data = await apiFetch("/parse-jd", { body: { job_desc } });
+    const data = await apiFetch("/parse-jd", { body: { job_desc: clampJD(job_desc) } });
     await setToStorage({ session_jd_cache_id: data.jd_cache_id });
     return data;
 }
@@ -131,7 +132,7 @@ async function handleAnalyzeATS({ job_desc, jd_cache_id }) {
 
     try {
         const data = await apiFetch("/calculate-ats-detailed", {
-            body: { job_desc, jd_cache_id },
+            body: { job_desc: clampJD(job_desc), jd_cache_id },
         });
         await setToStorage({
             analyze_status: "done",
@@ -152,7 +153,7 @@ async function handleOptimizeResume({ job_desc, jd_cache_id, original_ats_score,
 
     try {
         const data = await apiFetch("/optimize-resume", {
-            body: { job_desc, jd_cache_id, original_ats_score, template: template || "jakes_resume" },
+            body: { job_desc: clampJD(job_desc), jd_cache_id, original_ats_score, template: template || undefined },
         });
         await setToStorage({
             optimization_status: "done",

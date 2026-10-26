@@ -4,11 +4,10 @@
 // ============================
 // Config
 // ============================
-const CONFIG = {
-    // ⚠️ Swap to production URL before deploying to Chrome Web Store
-    API_BASE: "http://localhost:8000",
-};
-const API_BASE = CONFIG.API_BASE; // shorthand alias used throughout
+// API_BASE / DASHBOARD_URL come from ../config.js (loaded before this script)
+const API_BASE = SCULPT_CONFIG.API_BASE; // shorthand alias used throughout
+const DASHBOARD_URL = SCULPT_CONFIG.DASHBOARD_URL;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 let jobDescriptionFull = "";
 let isExpanded = false;
 let currentUser = null;
@@ -215,7 +214,6 @@ function stopResultPoller() {
 /** Poll until optimization completes or errors (catches missed OPTIMIZE_DONE push). */
 function startResultPoller() {
     if (_resultPollerTimer) return; // already polling
-    console.log("[POLLER] Starting result poller");
     _resultPollerTimer = setInterval(async () => {
         const s = await getFromStorage([
             "optimization_status", "optimization_error",
@@ -505,7 +503,6 @@ function listenToBackground() {
                 setGenerateButtonRunning(true);
                 break;
             case "OPTIMIZE_DONE":
-                console.log("[MSG] Received OPTIMIZE_DONE push", message.payload);
                 stopResultPoller(); // cancel poller so it doesn't double-fire
                 handleOptimizeDone(message.payload);
                 break;
@@ -574,6 +571,7 @@ function initializeEventListeners() {
     if (loginBtn) loginBtn.addEventListener("click", handleLogin);
     if (signupBtn) signupBtn.addEventListener("click", handleSignup);
     if (logoutBtn) logoutBtn.addEventListener("click", handleLogout);
+    document.getElementById("forgotPasswordLink")?.addEventListener("click", handleForgotPassword);
     if (showSignupLink) showSignupLink.addEventListener("click", () => toggleAuthForm("signup"));
     if (showLoginLink) showLoginLink.addEventListener("click", () => toggleAuthForm("login"));
 
@@ -645,6 +643,7 @@ async function handleLogin(e) {
     const btn = document.getElementById("loginBtn");
 
     if (!email || !password) { errorEl.textContent = "Please fill in all fields"; return; }
+    if (!EMAIL_RE.test(email)) { errorEl.textContent = "Please enter a valid email address"; return; }
 
     errorEl.textContent = "";
     btn.disabled = true;
@@ -695,6 +694,29 @@ async function handleLogin(e) {
     }
 }
 
+async function handleForgotPassword(e) {
+    e.preventDefault();
+    const email = document.getElementById("loginEmail").value.trim();
+    const errorEl = document.getElementById("loginError");
+    if (!EMAIL_RE.test(email)) {
+        errorEl.textContent = "Enter your email above, then click Forgot password.";
+        return;
+    }
+    errorEl.textContent = "";
+    try {
+        const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Could not send reset email.");
+        showToast("If that account exists, a reset link is on its way.", "info");
+    } catch (err) {
+        errorEl.textContent = err.message || "Could not send reset email.";
+    }
+}
+
 async function handleSignup(e) {
     e.preventDefault();
     const email = document.getElementById("signupEmail").value.trim();
@@ -704,6 +726,7 @@ async function handleSignup(e) {
     const btn = document.getElementById("signupBtn");
 
     if (!email || !password) { errorEl.textContent = "Email and password are required"; return; }
+    if (!EMAIL_RE.test(email)) { errorEl.textContent = "Please enter a valid email address"; return; }
     if (password.length < 6) { errorEl.textContent = "Password must be at least 6 characters"; return; }
 
     errorEl.textContent = "";
@@ -1168,7 +1191,7 @@ function handleUploadError(msg) {
 // Event Handlers
 // ============================
 function handleLandingClick() {
-    chrome.tabs.create({ url: "http://localhost:5173" });
+    chrome.tabs.create({ url: DASHBOARD_URL });
 }
 
 function handleJobDescriptionInputChange() {
@@ -1604,7 +1627,6 @@ async function handleGenerateClick() {
 }
 
 function handleOptimizeDone(data) {
-    console.log("[handleOptimizeDone] called with:", JSON.stringify(data));
     stopResultPoller();          // idempotent — safe to call even if timer is null
     TaskProgress.done();
     setGenerateButtonRunning(false);
@@ -1855,14 +1877,11 @@ function updateUsageMeter(daily, monthly, weekly, limit, plan = "free") {
         ctaBanner.style.display = limitHit ? "flex" : "none";
         // Point upgrade link to the dashboard (opens in a new tab)
         const upgradeBtn = document.getElementById("upgradeCtaBtn");
-        if (upgradeBtn) upgradeBtn.href = "http://localhost:5173"; // swap for production URL
+        if (upgradeBtn) upgradeBtn.href = DASHBOARD_URL;
     }
 
     meter.style.display = "flex";
 }
-
-// Coming Soon handler — button is disabled + badged, nothing to do
-function handlePreviewClick() { /* coming soon */ }
 
 // ============================
 // UI Helpers
@@ -2375,7 +2394,7 @@ function showVerificationPendingScreen(email) {
         </h2>
         <p style="color:var(--muted);margin:0;line-height:1.6;font-size:13px;max-width:280px;">
           We've sent a verification link to<br>
-          <strong style="color:var(--accent);">${email}</strong>.<br><br>
+          <strong style="color:var(--accent);">${escapeHtml(email)}</strong>.<br><br>
           Click the link in the email to activate your account, then come back and sign in.
         </p>
         <button id="resendVerifyBtn"
@@ -2551,7 +2570,8 @@ function renderHistoryList(history) {
 
         // Score improvement badge
         const diff = item.score_improvement || (item.optimized_ats_score - item.original_ats_score) || 0;
-        const diffText = diff > 0 ? `+${diff}` : `${diff}`;
+        const diffNum = Number(diff) || 0;
+        const diffText = diffNum > 0 ? `+${diffNum}` : `${diffNum}`;
         const diffClass = diff > 0 ? "history-score-up" : "history-score-neutral";
 
         div.innerHTML = `
@@ -2560,15 +2580,15 @@ function renderHistoryList(history) {
                     ${escapeHtml(item.job_title || 'Optimized Resume')}
                 </div>
                 <div class="history-item-meta">
-                    <span class="history-item-date">${dateStr}</span>
+                    <span class="history-item-date">${escapeHtml(dateStr)}</span>
                     <span class="history-item-scores">
-                        Score: <strong style="color:var(--text);">${item.original_ats_score}%</strong> 
-                        → <strong style="color:var(--accent);">${item.optimized_ats_score}%</strong>
+                        Score: <strong style="color:var(--text);">${Number(item.original_ats_score) || 0}%</strong> 
+                        → <strong style="color:var(--accent);">${Number(item.optimized_ats_score) || 0}%</strong>
                         <span class="history-score-badge ${diffClass}">${diffText} pts</span>
                     </span>
                 </div>
             </div>
-            <button class="history-download-btn" data-id="${item.id}" title="Download PDF">
+            <button class="history-download-btn" data-id="${escapeHtml(String(item.id))}" title="Download PDF">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                     <polyline points="7 10 12 15 17 10"/>

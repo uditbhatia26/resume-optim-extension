@@ -24,7 +24,6 @@
     ],
     "host_permissions": [
         "http://localhost:8000/*",
-        "https://your-domain.com/*",
         "https://accounts.google.com/*",
         "https://www.googleapis.com/*"
     ],
@@ -48,4 +47,4 @@
     "content_security_policy": {
         "extension_pages": "script-src 'self'; object-src 'self'"
     }
-}
+}
