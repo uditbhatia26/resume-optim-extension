@@ -190,7 +190,11 @@ async function handleUploadResume({ base64, filename, ai_provider, ai_api_key, a
         const binaryStr = atob(base64);
         const bytes = new Uint8Array(binaryStr.length);
         for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-        const blob = new Blob([bytes], { type: "application/pdf" });
+        const isDocx = (filename || "").toLowerCase().endsWith(".docx");
+        const mime = isDocx
+            ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            : "application/pdf";
+        const blob = new Blob([bytes], { type: mime });
 
         const formData = new FormData();
         formData.append("file", blob, filename);

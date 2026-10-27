@@ -1068,8 +1068,10 @@ async function handleResumeUpload(e) {
     const errorEl2 = document.getElementById("uploadError2");
     [errorEl, errorEl2].forEach((el) => { if (el) el.textContent = ""; });
 
-    if (file.type !== "application/pdf") {
-        (errorEl || errorEl2).textContent = "Only PDF files are supported.";
+    const isPdf  = file.type === "application/pdf";
+    const isDocx = file.name.toLowerCase().endsWith(".docx");
+    if (!isPdf && !isDocx) {
+        (errorEl || errorEl2).textContent = "Only PDF or DOCX files are supported.";
         return;
     }
     if (file.size > 2 * 1024 * 1024) {
