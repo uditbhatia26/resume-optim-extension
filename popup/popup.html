@@ -4,34 +4,62 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ResumeSculpt - AI Resume Optimizer</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <meta name="description" content="Score your resume against a job description and generate a tailored version.">
+    <title>Sculpt: resume optimizer</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
+    <!-- Icon sprite: one set, 24px grid, stroke 1.75 -->
+    <svg class="sprite" aria-hidden="true" focusable="false">
+        <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></symbol>
+        <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></symbol>
+        <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></symbol>
+        <symbol id="i-code" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></symbol>
+        <symbol id="i-key" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 21 2"/><path d="m16 7 3 3"/></symbol>
+        <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></symbol>
+        <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+        <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></symbol>
+        <symbol id="i-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></symbol>
+        <symbol id="i-x" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+        <symbol id="i-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></symbol>
+        <symbol id="i-chevron-right" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></symbol>
+        <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></symbol>
+        <symbol id="i-activity" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></symbol>
+        <symbol id="i-zap" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></symbol>
+        <symbol id="i-refresh" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></symbol>
+        <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+        <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
+        <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></symbol>
+        <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+        <symbol id="i-eye" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></symbol>
+        <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></symbol>
+        <symbol id="i-mail" viewBox="0 0 24 24"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><polyline points="22 6 12 13 2 6"/></symbol>
+        <symbol id="i-loader" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></symbol>
+    </svg>
+
     <!-- Authentication Screen -->
     <div id="authScreen" style="display: none;">
         <div class="auth-container">
             <div class="logo-center">
-                <img src="./assets/sculpt-icon-alpha.png" height="60" alt="Logo" />
+                <img src="./assets/sculpt-mark.png" width="32" height="32" alt="" />
                 <h2>Sculpt</h2>
             </div>
+            <p class="auth-lede">Score your resume against a job posting, then tailor it.</p>
 
             <!-- Login Form -->
             <div id="loginForm" class="auth-form">
-                <h3>Login</h3>
-                <input type="email" id="loginEmail" placeholder="Email" class="auth-input" />
-                <input type="password" id="loginPassword" placeholder="Password" class="auth-input" />
-                <div id="loginError" class="error-message"></div>
-                <button id="loginBtn" class="btn btn-primary">Sign In</button>
-                <p class="auth-toggle" style="margin-top:8px;"><a href="#" id="forgotPasswordLink">Forgot password?</a></p>
+                <h3>Sign in</h3>
+                <input type="email" id="loginEmail" name="email" autocomplete="email" aria-label="Email" placeholder="Email" class="auth-input" />
+                <input type="password" id="loginPassword" name="password" autocomplete="current-password" aria-label="Password" placeholder="Password" class="auth-input" />
+                <div id="loginError" class="error-message" role="alert"></div>
+                <button id="loginBtn" type="button" class="btn btn-primary">Sign in</button>
+                <p class="auth-toggle"><a href="#" id="forgotPasswordLink">Forgot password?</a></p>
 
                 <div class="auth-divider"><span>or</span></div>
 
-                <button id="googleLoginBtn" class="btn btn-google">
-                    <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                <button id="googleLoginBtn" type="button" class="btn btn-google">
+                    <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                         <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
                         <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
                         <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
@@ -39,22 +67,22 @@
                     </svg>
                     Continue with Google
                 </button>
-                <p class="auth-toggle">Don't have an account? <a href="#" id="showSignup">Sign up</a></p>
+                <p class="auth-toggle">No account yet? <a href="#" id="showSignup">Create one</a></p>
             </div>
 
             <!-- Signup Form -->
             <div id="signupForm" class="auth-form" style="display: none;">
-                <h3>Sign Up</h3>
-                <input type="text" id="signupName" placeholder="Full Name (optional)" class="auth-input" />
-                <input type="email" id="signupEmail" placeholder="Email" class="auth-input" />
-                <input type="password" id="signupPassword" placeholder="Password (min 6 chars)" class="auth-input" />
-                <div id="signupError" class="error-message"></div>
-                <button id="signupBtn" class="btn btn-primary">Create Account</button>
+                <h3>Create account</h3>
+                <input type="text" id="signupName" name="name" autocomplete="name" aria-label="Full name (optional)" placeholder="Full name (optional)" class="auth-input" />
+                <input type="email" id="signupEmail" name="email" autocomplete="email" aria-label="Email" placeholder="Email" class="auth-input" />
+                <input type="password" id="signupPassword" name="new-password" autocomplete="new-password" aria-label="Password" placeholder="Password, 6 characters or more" class="auth-input" />
+                <div id="signupError" class="error-message" role="alert"></div>
+                <button id="signupBtn" type="button" class="btn btn-primary">Create account</button>
 
                 <div class="auth-divider"><span>or</span></div>
 
-                <button id="googleSignupBtn" class="btn btn-google">
-                    <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                <button id="googleSignupBtn" type="button" class="btn btn-google">
+                    <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                         <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
                         <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
                         <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
@@ -62,68 +90,79 @@
                     </svg>
                     Continue with Google
                 </button>
-                <p class="auth-toggle">Already have an account? <a href="#" id="showLogin">Login</a></p>
+                <p class="auth-toggle">Already registered? <a href="#" id="showLogin">Sign in</a></p>
             </div>
         </div>
     </div>
 
     <!-- Main Application (shown after login) -->
     <div id="mainApp" style="display: none;">
-        <div class="header">
+        <header class="header">
             <div class="logo">
-                <div class="logo-icon">
-                    <img src="./assets/sculpt-icon-alpha.png" height="20" width="20" alt="Logo" />
-                </div>
+                <img class="logo-icon" src="./assets/sculpt-mark.png" width="24" height="24" alt="" />
                 <div class="logo-text">Sculpt</div>
             </div>
             <div class="header-actions">
                 <span id="userEmail" class="user-email"></span>
-                <button class="settings-btn" id="homeBtn" title="Back to Home / New Job" style="display:none;">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
-                    </svg>
+                <button type="button" class="settings-btn" id="homeBtn" title="Back to home, new job" aria-label="Back to home, new job" style="display:none;">
+                    <svg class="icon" aria-hidden="true"><use href="#i-home"/></svg>
                 </button>
-                <button class="settings-btn" id="landingBtn" title="Open Dashboard">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M3 3h8v8H3zm0 10h8v8H3zm10-10h8v8h-8zm0 10h8v8h-8z"/>
-                    </svg>
+                <button type="button" class="settings-btn" id="landingBtn" title="Open dashboard" aria-label="Open dashboard">
+                    <svg class="icon" aria-hidden="true"><use href="#i-grid"/></svg>
                 </button>
-                <button class="settings-btn" id="logoutBtn" title="Logout">
-                    <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
-                        <path
-                            d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" />
-                    </svg>
+                <button type="button" class="settings-btn" id="logoutBtn" title="Sign out" aria-label="Sign out">
+                    <svg class="icon" aria-hidden="true"><use href="#i-logout"/></svg>
                 </button>
             </div>
-        </div>
+        </header>
 
         <!-- AI Provider Status Chip -->
         <div id="aiKeyStatusBar" class="ai-key-status-bar" style="display:none;">
-            <div class="ai-key-chip" id="aiKeyChip">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="flex-shrink:0;">
-                    <path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/>
-                </svg>
+            <div class="ai-key-chip" id="aiKeyChip" role="status">
+                <svg class="icon" aria-hidden="true"><use href="#i-key"/></svg>
                 <span id="aiKeyChipText">No API key set</span>
             </div>
-            <button class="ai-key-change-btn" id="aiKeyChangeBtn">Configure</button>
+            <button type="button" class="ai-key-change-btn" id="aiKeyChangeBtn">Configure</button>
         </div>
 
-        <div class="main-content">
+        <!-- Step tracker: five stages, state set by the script -->
+        <ol class="progress-section" aria-label="Progress">
+            <li class="progress-item" title="Add job description">
+                <div class="progress-icon pending" id="step1">1</div>
+                <span>Add job description</span>
+            </li>
+            <li class="progress-item" title="Analyze resume compatibility">
+                <div class="progress-icon pending" id="step2">2</div>
+                <span>Analyze resume compatibility</span>
+            </li>
+            <li class="progress-item" title="Generate optimized version">
+                <div class="progress-icon pending" id="step3">3</div>
+                <span>Generate AI-optimized version</span>
+            </li>
+            <li class="progress-item" title="Calculate optimization score">
+                <div class="progress-icon pending" id="step4">4</div>
+                <span>Calculate optimization score</span>
+            </li>
+            <li class="progress-item" title="Download final resume">
+                <div class="progress-icon pending" id="step5">5</div>
+                <span>Download final resume</span>
+            </li>
+        </ol>
+
+        <main class="main-content">
             <!-- AI Provider / API Key Section -->
-            <div class="action-section" id="aiKeySection">
-                <div class="section-title">AI Provider</div>
+            <section class="action-section" id="aiKeySection">
+                <h2 class="section-title">AI provider</h2>
 
                 <!-- Saved key state -->
                 <div id="aiKeySavedState" style="display:none;">
                     <div class="resume-uploaded-card">
                         <div class="resume-file-info">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="color:#0057FF;flex-shrink:0;">
-                                <path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/>
-                            </svg>
+                            <svg class="icon" aria-hidden="true"><use href="#i-key"/></svg>
                             <span class="resume-filename-text" id="aiKeyProviderText">OpenAI</span>
-                            <span class="ai-key-masked" id="aiKeyMaskedText">sk-...????</span>
+                            <span class="ai-key-masked" id="aiKeyMaskedText">sk-…</span>
                         </div>
-                        <button class="change-resume-btn" id="aiKeyEditBtn">Change</button>
+                        <button type="button" class="change-resume-btn" id="aiKeyEditBtn">Change</button>
                     </div>
                 </div>
 
@@ -141,14 +180,12 @@
                             </select>
                         </div>
                         <div class="ai-key-field">
-                            <label class="ai-key-label" for="apiKeyInput">API Key</label>
+                            <label class="ai-key-label" for="apiKeyInput">API key</label>
                             <div class="ai-key-input-row">
                                 <input type="password" class="ai-key-input" id="apiKeyInput"
                                     placeholder="Paste your API key here" autocomplete="off" />
-                                <button class="ai-key-toggle-btn" id="apiKeyToggleBtn" title="Show/hide key">
-                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zm0 13c-3.04 0-5.5-2.46-5.5-5.5S8.96 6.5 12 6.5s5.5 2.46 5.5 5.5S15.04 17.5 12 17.5zm0-9c-1.93 0-3.5 1.57-3.5 3.5s1.57 3.5 3.5 3.5 3.5-1.57 3.5-3.5S13.93 8.5 12 8.5z"/>
-                                    </svg>
+                                <button type="button" class="ai-key-toggle-btn" id="apiKeyToggleBtn" title="Show or hide key" aria-label="Show or hide key">
+                                    <svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg>
                                 </button>
                             </div>
                         </div>
@@ -157,64 +194,52 @@
                             <input type="text" class="ai-key-input" id="modelInput"
                                 placeholder="Leave blank for provider default" autocomplete="off" />
                         </div>
-                        <div id="aiKeyError" class="error-message"></div>
-                        <div id="aiKeySuccess" class="ai-key-success" style="display:none;"></div>
+                        <div id="aiKeyError" class="error-message" role="alert"></div>
+                        <div id="aiKeySuccess" class="ai-key-success" role="status" style="display:none;"></div>
                         <div class="ai-key-actions">
-                            <button class="btn btn-outline" id="aiKeyTestBtn">Test Connection</button>
-                            <button class="btn btn-primary" id="aiKeySaveBtn">Save Key</button>
+                            <button type="button" class="btn btn-outline" id="aiKeyTestBtn">Test connection</button>
+                            <button type="button" class="btn btn-primary" id="aiKeySaveBtn">Save key</button>
                         </div>
                     </div>
                 </div>
-            </div>
+            </section>
 
             <!-- Resume Upload Section -->
-            <div class="action-section" id="resumeSection">
-                <div class="section-title">Your Resume</div>
+            <section class="action-section" id="resumeSection">
+                <h2 class="section-title">Your resume</h2>
 
                 <!-- No resume uploaded yet -->
                 <div id="noResumeState">
-                    <label for="resumeFileInput" class="btn btn-primary" id="uploadResumeLabel"
-                        style="cursor:pointer; margin-bottom: 0;">
-                        <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                            <polyline points="17 8 12 3 7 8" />
-                            <line x1="12" y1="3" x2="12" y2="15" />
-                        </svg>
-                        Upload Resume (PDF)
+                    <label for="resumeFileInput" class="btn btn-primary" id="uploadResumeLabel">
+                        <svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg>
+                        Upload resume (PDF or DOCX)
                     </label>
-                    <div id="uploadError" class="error-message"></div>
+                    <div id="uploadError" class="error-message" role="alert"></div>
                 </div>
 
                 <!-- Resume already uploaded -->
                 <div id="hasResumeState" style="display:none;">
                     <div class="resume-uploaded-card">
                         <div class="resume-file-info">
-                            <svg class="icon" viewBox="0 0 24 24" fill="currentColor"
-                                style="color:#0057FF;flex-shrink:0;">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                <polyline points="14 2 14 8 20 8" />
-                            </svg>
+                            <svg class="icon" aria-hidden="true"><use href="#i-file"/></svg>
                             <span class="resume-filename-text" id="resumeFilenameText">resume.pdf</span>
                         </div>
                         <label for="resumeFileInput" class="change-resume-btn">Change</label>
                     </div>
-                    <div id="uploadError2" class="error-message"></div>
+                    <div id="uploadError2" class="error-message" role="alert"></div>
                 </div>
 
                 <!-- Hidden file input -->
-                <input type="file" id="resumeFileInput" accept=".pdf,.docx" style="display:none;" />
-            </div>
+                <input type="file" id="resumeFileInput" accept=".pdf,.docx" class="visually-hidden" />
+            </section>
 
             <!-- ATS Score Breakdown Card (shown after analyze) -->
-            <div id="atsBreakdownCard" class="ats-breakdown-card" style="display:none;">
+            <section id="atsBreakdownCard" class="ats-breakdown-card" style="display:none;" aria-label="ATS score">
 
                 <!-- Always-visible summary row -->
-                <button class="ats-summary-row" id="atsToggleBtn" aria-expanded="false">
+                <button type="button" class="ats-summary-row" id="atsToggleBtn" aria-expanded="false">
                     <div class="ats-summary-left">
-                        <div class="ats-summary-title-wrap">
-                            <span class="ats-summary-bar"></span>
-                            <span class="ats-summary-title">ATS Score</span>
-                        </div>
+                        <span class="ats-summary-title">ATS score</span>
                         <div class="ats-summary-scores">
                             <span id="atsSummaryScore" class="ats-summary-score">--</span>
                             <span id="atsSummaryBadge" class="ats-match-badge"></span>
@@ -222,9 +247,7 @@
                     </div>
                     <div class="ats-summary-right">
                         <span class="ats-toggle-hint">Details</span>
-                        <svg id="atsChevron" class="ats-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-                            <polyline points="6 9 12 15 18 9"/>
-                        </svg>
+                        <svg id="atsChevron" class="icon ats-chevron" aria-hidden="true"><use href="#i-chevron"/></svg>
                     </div>
                 </button>
 
@@ -232,29 +255,23 @@
                 <div id="atsBreakdownBody" class="ats-breakdown-body-wrap" style="display:none;">
                     <div class="ats-breakdown-inner">
 
-                        <!-- Circular gauge -->
+                        <!-- Overall reading with its meter -->
                         <div class="ats-gauge-wrap">
-                            <div class="ats-gauge-ring-wrap">
-                                <svg class="ats-gauge-svg" viewBox="0 0 100 100">
-                                    <circle class="ats-gauge-track" cx="50" cy="50" r="40" />
-                                    <circle id="atsGaugeFill" class="ats-gauge-fill" cx="50" cy="50" r="40"
-                                        stroke-dasharray="0 251.3" />
-                                </svg>
-                                <div class="ats-gauge-center">
-                                    <div class="ats-gauge-score"><span id="atsGaugeValue">--</span><span class="ats-gauge-pct">%</span></div>
-                                    <div class="ats-gauge-label">OVERALL</div>
-                                </div>
-                            </div>
+                            <div class="ats-gauge-score"><span id="atsGaugeValue">--</span><span class="ats-gauge-pct">%</span></div>
+                            <div class="ats-gauge-label">Overall match</div>
+                            <svg class="ats-gauge-svg" viewBox="0 0 251.3 4" preserveAspectRatio="none" aria-hidden="true">
+                                <line class="ats-gauge-track" x1="0" y1="2" x2="251.3" y2="2" />
+                                <line id="atsGaugeFill" class="ats-gauge-fill" x1="0" y1="2" x2="251.3" y2="2" stroke-dasharray="0 251.3" />
+                            </svg>
                             <div id="atsImprovementChip" class="ats-improvement-chip" style="display:none;"></div>
                         </div>
 
                         <!-- Sub-score rows -->
                         <div class="ats-sub-scores">
                             <div class="ats-sub-row">
-                                <div class="ats-sub-icon ats-icon-keyword">🔍</div>
                                 <div class="ats-sub-info">
-                                    <div class="ats-sub-name">Keyword Match</div>
-                                    <div class="ats-sub-bar-wrap"><div id="atsBarKeyword" class="ats-sub-bar ats-bar-keyword" style="width:0%"></div></div>
+                                    <div class="ats-sub-name">Keyword match</div>
+                                    <div class="ats-sub-bar-wrap"><div id="atsBarKeyword" class="ats-sub-bar ats-bar-keyword"></div></div>
                                 </div>
                                 <div class="ats-sub-right">
                                     <span id="atsValKeyword" class="ats-sub-pct">--%</span>
@@ -262,10 +279,9 @@
                                 </div>
                             </div>
                             <div class="ats-sub-row">
-                                <div class="ats-sub-icon ats-icon-skills">💼</div>
                                 <div class="ats-sub-info">
-                                    <div class="ats-sub-name">Skills Coverage</div>
-                                    <div class="ats-sub-bar-wrap"><div id="atsBarSkills" class="ats-sub-bar ats-bar-skills" style="width:0%"></div></div>
+                                    <div class="ats-sub-name">Skills coverage</div>
+                                    <div class="ats-sub-bar-wrap"><div id="atsBarSkills" class="ats-sub-bar ats-bar-skills"></div></div>
                                 </div>
                                 <div class="ats-sub-right">
                                     <span id="atsValSkills" class="ats-sub-pct">--%</span>
@@ -273,10 +289,9 @@
                                 </div>
                             </div>
                             <div class="ats-sub-row">
-                                <div class="ats-sub-icon ats-icon-format">📄</div>
                                 <div class="ats-sub-info">
                                     <div class="ats-sub-name">Formatting</div>
-                                    <div class="ats-sub-bar-wrap"><div id="atsBarFormat" class="ats-sub-bar ats-bar-format" style="width:0%"></div></div>
+                                    <div class="ats-sub-bar-wrap"><div id="atsBarFormat" class="ats-sub-bar ats-bar-format"></div></div>
                                 </div>
                                 <div class="ats-sub-right">
                                     <span id="atsValFormat" class="ats-sub-pct">--%</span>
@@ -284,10 +299,9 @@
                                 </div>
                             </div>
                             <div class="ats-sub-row">
-                                <div class="ats-sub-icon ats-icon-exp">🎯</div>
                                 <div class="ats-sub-info">
-                                    <div class="ats-sub-name">Experience Fit</div>
-                                    <div class="ats-sub-bar-wrap"><div id="atsBarExp" class="ats-sub-bar ats-bar-exp" style="width:0%"></div></div>
+                                    <div class="ats-sub-name">Experience fit</div>
+                                    <div class="ats-sub-bar-wrap"><div id="atsBarExp" class="ats-sub-bar ats-bar-exp"></div></div>
                                 </div>
                                 <div class="ats-sub-right">
                                     <span id="atsValExp" class="ats-sub-pct">--%</span>
@@ -297,61 +311,49 @@
                         </div>
                     </div>
 
-                    <!-- AI Insight strip -->
+                    <!-- AI insight strip -->
                     <div id="atsInsightStrip" class="ats-insight-strip" style="display:none;">
-                        <div class="ats-insight-icon">💡</div>
+                        <svg class="icon" aria-hidden="true"><use href="#i-info"/></svg>
                         <div class="ats-insight-text" id="atsInsightText"></div>
                     </div>
                 </div>
-            </div>
+            </section>
 
             <!-- Fallback plain score (hidden once breakdown shows) -->
             <div id="originalScoreFallback" class="status-section" style="display:none;">
-                <div class="status-header"><div class="status-title">Original Match Score</div></div>
+                <div class="status-header"><div class="status-title">Original match score</div></div>
                 <div class="status-value" id="originalScore">--</div>
             </div>
 
-            <div class="action-section">
-                <div class="section-title">Job Analysis</div>
+            <section class="action-section">
+                <h2 class="section-title">Job analysis</h2>
 
                 <!-- Job Description Input Area -->
                 <div class="input-section">
-                    <!-- Auto-fetch bar: shown at the top of the textarea area -->
+                    <!-- Auto-fetch bar: shown above the textarea when a posting is detected -->
                     <div id="fetchFromPageBar" class="fetch-bar" style="display:none;">
                         <div class="fetch-bar-info">
-                            <svg class="icon" viewBox="0 0 24 24" fill="currentColor" style="color:#0057FF;flex-shrink:0;">
-                                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                            </svg>
-                            <span id="fetchBarLabel" style="font-size:11px; color:#5a6a85;">Detecting job description…</span>
+                            <svg class="icon" aria-hidden="true"><use href="#i-link"/></svg>
+                            <span id="fetchBarLabel" class="fetch-bar-label">Detecting job description…</span>
                         </div>
-                        <button id="fetchFromPageBtn" class="btn btn-fetch" disabled>
-                            <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                                <polyline points="7 10 12 15 17 10" />
-                            </svg>
-                            Use from Page
+                        <button type="button" id="fetchFromPageBtn" class="btn btn-fetch" disabled>
+                            <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>
+                            Use from page
                         </button>
                     </div>
-                    <textarea id="jobDescriptionInput" class="job-input-textarea"
-                        placeholder="Paste the job description here..." rows="4"></textarea>
-                    <button class="btn btn-primary" id="addJobBtn">
-                        <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
-                            <path
-                                d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                        </svg>
-                        Add Job Description
+                    <textarea id="jobDescriptionInput" class="job-input-textarea" aria-label="Job description"
+                        placeholder="Paste the job description here…" rows="4"></textarea>
+                    <button type="button" class="btn btn-primary" id="addJobBtn">
+                        <svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>
+                        Add job description
                     </button>
                 </div>
 
                 <div class="job-description-container" id="jobContainer" style="display: none;">
                     <div class="jd-card-header">
-                        <span class="jd-card-title">Job Description</span>
-                        <button id="removeJobBtn" class="jd-remove-btn" title="Remove job description">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-                                <line x1="18" y1="6" x2="6" y2="18" />
-                                <line x1="6" y1="6" x2="18" y2="18" />
-                            </svg>
+                        <span class="jd-card-title">Job description</span>
+                        <button type="button" id="removeJobBtn" class="jd-remove-btn" title="Remove job description">
+                            <svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>
                             Remove
                         </button>
                     </div>
@@ -359,261 +361,197 @@
                         <!-- Job description will be populated here -->
                     </div>
                     <div class="job-description-fade" id="fadeOverlay"></div>
-                    <button class="read-more-btn" id="readMoreBtn">Show Full Description</button>
+                    <button type="button" class="read-more-btn" id="readMoreBtn">Show full description</button>
                 </div>
 
-                <button class="btn btn-secondary" id="analyzeBtn" disabled>
-                    <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-                    </svg>
-                    Analyze Compatibility
+                <button type="button" class="btn btn-secondary" id="analyzeBtn" disabled>
+                    <svg class="icon" aria-hidden="true"><use href="#i-activity"/></svg>
+                    Analyze compatibility
                 </button>
-            </div>
+            </section>
 
-            <div class="action-section">
-                <div class="section-title">AI Optimization</div>
+            <section class="action-section" id="optimizeSection">
+                <h2 class="section-title">AI optimization</h2>
 
                 <!-- Template Selector -->
-                <div class="template-selector-wrap" style="margin-bottom: 12px;">
-                    <label for="templateSelect" class="template-select-label" style="display:block; font-size:11px; font-weight:600; color:var(--text-secondary); margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;">
-                        Target Template
-                    </label>
-                    <select id="templateSelect" class="template-select" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:12px; font-family:inherit; cursor:pointer;">
-                        <option value="jakes_resume">Jake's Resume (Standard Tech / Clean ATS)</option>
+                <div class="template-selector-wrap">
+                    <label for="templateSelect" class="template-select-label">Target template</label>
+                    <select id="templateSelect" class="template-select">
+                        <option value="jakes_resume">Jake’s Resume (Standard Tech / Clean ATS)</option>
                         <option value="classic_ivy">Classic Ivy (Corporate / Serif)</option>
                         <option value="compact_onepage">Compact (Ultra-Dense 1-Page)</option>
                     </select>
                 </div>
 
-                <button class="btn btn-primary" id="generateBtn" disabled>
-                    <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                    </svg>
-                    Generate Optimized Resume
+                <button type="button" class="btn btn-primary" id="generateBtn" disabled>
+                    <svg class="icon" aria-hidden="true"><use href="#i-zap"/></svg>
+                    Generate optimized resume
                 </button>
 
-                <button class="btn btn-secondary coming-soon-btn" id="previewBtn" disabled>
-                    <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
-                        <circle cx="11" cy="11" r="8" />
-                        <path d="m21 21-4.35-4.35" />
-                    </svg>
-                    Preview Changes
+                <button type="button" class="btn btn-secondary coming-soon-btn" id="previewBtn" disabled>
+                    <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+                    Preview changes
                     <span class="coming-soon-badge">Soon</span>
                 </button>
 
-                <button class="btn btn-success" id="downloadBtn" disabled>
-                    <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                        <polyline points="7 10 12 15 17 10" />
-                        <line x1="12" y1="15" x2="12" y2="3" />
-                    </svg>
-                    Download Resume (PDF)
+                <button type="button" class="btn btn-success" id="downloadBtn" disabled>
+                    <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>
+                    Download resume (PDF)
                 </button>
 
-                <button class="btn btn-outline" id="downloadTexBtn" disabled style="margin-top: 8px;">
-                    <svg class="icon" viewBox="0 0 24 24" fill="currentColor" style="width:14px; height:14px;">
-                        <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
-                    </svg>
-                    Download .tex Source (Overleaf)
+                <button type="button" class="btn btn-outline" id="downloadTexBtn" disabled>
+                    <svg class="icon" aria-hidden="true"><use href="#i-code"/></svg>
+                    Download .tex source (Overleaf)
                 </button>
 
                 <!-- Start Over Button (visible once optimized) -->
-                <button class="btn btn-outline" id="startOverBtn" style="display: none; margin-top: 8px; width: 100%; justify-content: center;">
-                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;">
-                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                        <path d="M3 3v5h5" />
-                    </svg>
-                    ✦ Start New Optimization
+                <button type="button" class="btn btn-outline" id="startOverBtn" style="display: none;">
+                    <svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg>
+                    Start new optimization
                 </button>
 
                 <!-- Post-Download Confirmation Banner -->
-                <div id="downloadSuccessBanner" style="display: none; margin-top: 10px; padding: 12px; background: rgba(0, 201, 167, 0.08); border: 1px solid rgba(0, 201, 167, 0.28); border-radius: 8px; text-align: center;">
-                    <div style="font-size: 13px; font-weight: 700; color: #00c9a7; margin-bottom: 4px; display: flex; align-items: center; justify-content: center; gap: 6px;">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:15px; height:15px;">
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                        Download Started!
+                <div id="downloadSuccessBanner" class="done-note" role="status" style="display: none;">
+                    <div class="done-note__title">
+                        <svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>
+                        Download started
                     </div>
-                    <div style="font-size: 11px; color: var(--muted); margin-bottom: 8px;">
-                        Resume exported. Ready to tailor for another role?
-                    </div>
-                    <button class="btn btn-primary" id="postDownloadHomeBtn" style="width: 100%; justify-content: center; padding: 8px 12px; font-size: 12px;">
-                        <svg class="icon" viewBox="0 0 24 24" fill="currentColor" style="width: 14px; height: 14px;">
-                            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
-                        </svg>
-                        Back to Home (New Job)
+                    <div class="done-note__text">Resume exported. Ready to tailor it for another role?</div>
+                    <button type="button" class="btn btn-primary" id="postDownloadHomeBtn">
+                        <svg class="icon" aria-hidden="true"><use href="#i-home"/></svg>
+                        Back to home, new job
                     </button>
                 </div>
-            </div>
+            </section>
 
             <!-- Task Progress Bar (shown during analyze / generate) -->
-            <div id="taskProgressWrap" style="display:none; margin-bottom:16px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                    <span id="taskProgressLabel" style="font-size:11px; font-weight:600; color:var(--accent); text-transform:uppercase; letter-spacing:0.5px;"></span>
-                    <span id="taskProgressPct" style="font-size:11px; font-weight:700; color:var(--text);">0%</span>
+            <div id="taskProgressWrap" class="task-progress" role="status" style="display:none;">
+                <div class="task-progress__row">
+                    <span id="taskProgressLabel" class="task-progress__label"></span>
+                    <span id="taskProgressPct" class="task-progress__pct">0%</span>
                 </div>
-                <div style="height:8px; border-radius:99px; background:var(--surface2); border:1px solid var(--border); overflow:hidden;">
-                    <div id="taskProgressBar"
-                         style="height:100%; width:0%; border-radius:99px;
-                                background:var(--accent);
-                                transition:width 0.6s cubic-bezier(0.4,0,0.2,1);
-                                box-shadow:0 2px 8px rgba(0,87,255,0.25);">
-                    </div>
+                <div class="task-progress__track">
+                    <div id="taskProgressBar" class="task-progress__bar"></div>
                 </div>
-                <div style="font-size:10px; color:var(--muted); margin-top:5px;" id="taskProgressEta"></div>
+                <div class="task-progress__eta" id="taskProgressEta"></div>
             </div>
 
-
-            <!-- New Optimized Resume Score Section -->
-            <div class="optimized-score-section" id="optimizedScoreSection" style="display: none;">
-                <div class="section-title">Optimization Results</div>
+            <!-- Optimized resume score section -->
+            <section class="optimized-score-section" id="optimizedScoreSection" style="display: none;">
+                <h2 class="section-title">Optimization results</h2>
                 <div class="score-comparison">
                     <div class="score-card original-score-card">
-                        <div class="score-label">Original Score</div>
+                        <div class="score-label">Original score</div>
                         <div class="score-value" id="originalScoreDisplay">--</div>
                     </div>
                     <div class="score-arrow">
-                        <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M5 12h14m-7-7l7 7-7 7" />
-                        </svg>
+                        <svg class="icon" aria-hidden="true"><use href="#i-chevron-right"/></svg>
                     </div>
                     <div class="score-card optimized-score-card">
-                        <div class="score-label">Optimized Score</div>
+                        <div class="score-label">Optimized score</div>
                         <div class="score-value" id="optimizedScore">--</div>
                     </div>
+                    <div class="improvement-indicator" id="improvementIndicator">
+                        <div class="improvement-text" id="improvementText">Calculating improvement…</div>
+                    </div>
+                    <div class="score-ruler" aria-hidden="true">
+                        <span class="score-ruler__scale"></span>
+                        <span class="score-ruler__span"></span>
+                        <span class="score-ruler__guide score-ruler__guide--was"><i id="rulerWas">0</i></span>
+                        <span class="score-ruler__guide score-ruler__guide--now"><i id="rulerNow">0</i></span>
+                        <span class="score-ruler__edge score-ruler__edge--lo">0</span>
+                        <span class="score-ruler__edge score-ruler__edge--hi">100</span>
+                    </div>
                 </div>
-                <div class="improvement-indicator" id="improvementIndicator">
-                    <div class="improvement-text" id="improvementText">Calculating improvement...</div>
-                </div>
-                <button class="btn btn-secondary" id="recalculateBtn">
-                    <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                        <path d="M3 3v5h5" />
-                        <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
-                        <path d="M21 21v-5h-5" />
-                    </svg>
-                    Recalculate Score
+                <button type="button" class="btn btn-secondary" id="recalculateBtn">
+                    <svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg>
+                    Recalculate score
                 </button>
-            </div>
+            </section>
 
             <!-- What Changed Changelog Panel -->
-            <div id="changelogPanel" class="changelog-panel" style="display:none;">
-                <button class="changelog-toggle" id="changelogToggle">
+            <section id="changelogPanel" class="changelog-panel" style="display:none;">
+                <button type="button" class="changelog-toggle" id="changelogToggle">
                     <span class="changelog-toggle-label">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;flex-shrink:0;">
-                            <polyline points="9 18 15 12 9 6" />
-                        </svg>
-                        What Changed
+                        <svg class="icon" aria-hidden="true"><use href="#i-chevron-right"/></svg>
+                        What changed
                     </span>
                     <span id="changelogBadge" class="changelog-badge"></span>
                 </button>
                 <div id="changelogBody" class="changelog-body" style="display:none;">
                     <ul id="changelogList" class="changelog-list"></ul>
                 </div>
-            </div>
+            </section>
 
             <!-- Explain Changes Button & Drawer Panel -->
-            <button class="btn btn-outline" id="explainChangesBtn" style="display:none; margin-top:8px; margin-bottom:12px; width:100%; justify-content:center; gap:6px;">
-                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="16" x2="12" y2="12"></line>
-                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                </svg>
-                💡 Why were these changes made?
+            <button type="button" class="btn btn-outline" id="explainChangesBtn" style="display:none;">
+                <svg class="icon" aria-hidden="true"><use href="#i-info"/></svg>
+                Why were these changes made?
             </button>
 
             <!-- Explanation Panel -->
-            <div id="explanationPanel" style="display:none; margin-top:0; margin-bottom:14px; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 14px; box-shadow:var(--shadow-sm);">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid var(--border);">
-                    <span style="font-size:12px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:5px;">
-                        <span>💡</span> Strategic Change Rationale
-                    </span>
-                    <button id="closeExplanationBtn" style="background:none; border:none; color:var(--muted); font-size:14px; cursor:pointer; padding:2px 6px;">✕</button>
+            <section id="explanationPanel" class="explanation-panel" style="display:none;">
+                <div class="explanation-head">
+                    <h2 class="explanation-title">Change rationale</h2>
+                    <button type="button" id="closeExplanationBtn" class="icon-btn" aria-label="Close explanation">
+                        <svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>
+                    </button>
                 </div>
 
                 <!-- Loading State -->
-                <div id="explanationLoading" style="display:none; text-align:center; padding:14px; color:var(--muted); font-size:12px;">
-                    <svg class="icon" viewBox="0 0 24 24" fill="currentColor" style="animation: pulse 1s infinite; width:16px; height:16px; margin: 0 auto 6px auto; display:block;">
-                        <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
-                    </svg>
-                    Analyzing transformations & strategy…
+                <div id="explanationLoading" class="explanation-loading" role="status" style="display:none;">
+                    <svg class="icon icon-spin keep-motion" aria-hidden="true"><use href="#i-loader"/></svg>
+                    Analyzing transformations and strategy…
                 </div>
 
                 <!-- Explanation Content -->
-                <div id="explanationContent" style="display:none; max-height:280px; overflow-y:auto; padding-right:4px;">
+                <div id="explanationContent" class="explanation-content" style="display:none;">
                     <!-- Summary Rationale -->
-                    <div id="expSummaryBox" style="margin-bottom:10px; background:var(--surface2); padding:8px 10px; border-radius:6px; border-left:3px solid var(--accent);">
-                        <div style="font-size:10px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:3px;">🎯 Target Positioning</div>
-                        <div id="expSummaryText" style="font-size:11px; color:var(--text); line-height:1.4;"></div>
+                    <div id="expSummaryBox" class="exp-block exp-block--lead">
+                        <div class="exp-block__title">Target positioning</div>
+                        <div id="expSummaryText" class="exp-block__text"></div>
                     </div>
 
                     <!-- Key Bullet Enhancements -->
-                    <div style="margin-bottom:10px;">
-                        <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">📈 Key Bullet Upgrades</div>
-                        <div id="expBulletsList" style="display:flex; flex-direction:column; gap:8px;"></div>
+                    <div class="exp-block">
+                        <div class="exp-block__title">Key bullet upgrades</div>
+                        <div id="expBulletsList" class="exp-bullets"></div>
                     </div>
 
                     <!-- Skills Strategy -->
-                    <div id="expSkillsBox" style="margin-bottom:10px;">
-                        <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">🔑 Skills Strategy</div>
-                        <ul id="expSkillsList" style="margin:0; padding-left:16px; font-size:11px; color:var(--text); line-height:1.45;"></ul>
+                    <div id="expSkillsBox" class="exp-block">
+                        <div class="exp-block__title">Skills strategy</div>
+                        <ul id="expSkillsList" class="exp-skills"></ul>
                     </div>
 
                     <!-- Preservation Note -->
-                    <div id="expPreservationBox" style="font-size:10.5px; color:#10a37f; background:rgba(16,163,127,0.08); border:1px solid rgba(16,163,127,0.25); border-radius:6px; padding:6px 8px; line-height:1.4;">
-                        🛡️ <span id="expPreservationText"></span>
+                    <div id="expPreservationBox" class="exp-keep">
+                        <svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>
+                        <span id="expPreservationText"></span>
                     </div>
                 </div>
-            </div>
+            </section>
 
-            <div class="progress-section">
-                <div class="section-title">Progress</div>
-                <div class="progress-item">
-                    <div class="progress-icon pending" id="step1">1</div>
-                    <span>Add job description</span>
-                </div>
-                <div class="progress-item">
-                    <div class="progress-icon pending" id="step2">2</div>
-                    <span>Analyze resume compatibility</span>
-                </div>
-                <div class="progress-item">
-                    <div class="progress-icon pending" id="step3">3</div>
-                    <span>Generate AI-optimized version</span>
-                </div>
-                <div class="progress-item">
-                    <div class="progress-icon pending" id="step4">4</div>
-                    <span>Calculate optimization score</span>
-                </div>
-                <div class="progress-item">
-                    <div class="progress-icon pending" id="step5">5</div>
-                    <span>Download final resume</span>
-                </div>
-            </div>
-
-            <!-- ── History Panel ─────────────────────────────── -->
-            <div class="history-panel" id="historyPanel" style="display:none;">
-                <button class="history-toggle" id="historyToggle" aria-expanded="false">
+            <!-- History Panel -->
+            <section class="history-panel" id="historyPanel" style="display:none;">
+                <button type="button" class="history-toggle" id="historyToggle" aria-expanded="false">
                     <span class="history-toggle-label">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;flex-shrink:0;">
-                            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                        </svg>
-                        Optimization History
+                        <svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>
+                        Optimization history
                     </span>
-                    <div style="display:flex;align-items:center;gap:6px;">
+                    <span class="history-toggle-end">
                         <span id="historyCount" class="history-count-badge"></span>
-                        <svg id="historyChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="width:14px;height:14px;color:#8494b0;transition:transform 0.25s;">
-                            <polyline points="6 9 12 15 18 9"/>
-                        </svg>
-                    </div>
+                        <svg id="historyChevron" class="icon" aria-hidden="true"><use href="#i-chevron"/></svg>
+                    </span>
                 </button>
                 <div id="historyBody" class="history-body" style="display:none;">
                     <div id="historyList" class="history-list">
                         <!-- Items injected by popup.js -->
                     </div>
                 </div>
-            </div>
+            </section>
 
-        </div>
+        </main>
     </div> <!-- End of mainApp -->
 
     <script src="../config.js"></script>

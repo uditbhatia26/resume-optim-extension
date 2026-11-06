@@ -16,6 +16,19 @@ let currentUser = null;
 // Helpers
 // ============================
 
+/** Inline icon from the sprite in popup.html (one set, one stroke). */
+function icon(name, extraClass = "") {
+    return `<svg class="icon ${extraClass}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
+}
+const SPINNER = icon("loader", "icon-spin keep-motion");
+
+/** Briefly ring a section so the user sees where to act next. */
+function flashSection(el) {
+    if (!el) return;
+    el.classList.add("flash");
+    setTimeout(() => el.classList.remove("flash"), 1800);
+}
+
 /** Safely extract a human-readable message from a FastAPI error payload. */
 function apiErrorMessage(error, fallback) {
     if (!error) return fallback;
@@ -107,7 +120,7 @@ async function restoreSession() {
     if (s.analyze_status === "running") {
         const btn = document.getElementById("analyzeBtn");
         btn.disabled = true;
-        showLoadingState(btn, "Analyzing...");
+        showLoadingState(btn, "Analyzing…");
         TaskProgress.start("Analyzing resume compatibility", 15_000);
         startAnalyzePoller();
     } else if (s.analyze_status === "error") {
@@ -282,7 +295,7 @@ const TaskProgress = {
         if (!wrap) return;
         wrap.style.display = "block";
         lbl.textContent = label;
-        bar.style.width = "0%";
+        bar.style.transform = "scaleX(0)";
         pctEl.textContent = "0%";
         eta.textContent = "";
 
@@ -293,11 +306,11 @@ const TaskProgress = {
             const eased = (1 - Math.pow(1 - ratio, 3)) * 90;
             this._pct = Math.round(eased);
 
-            bar.style.width = `${this._pct}%`;
+            bar.style.transform = `scaleX(${this._pct / 100})`;
             pctEl.textContent = `${this._pct}%`;
 
             const remaining = Math.max(0, Math.round((this._duration - elapsed) / 1000));
-            eta.textContent = remaining > 0 ? `~${remaining}s remaining` : "Almost done…";
+            eta.textContent = remaining > 0 ? `About ${remaining}s remaining` : "Almost done…";
         }, 400);
     },
 
@@ -312,13 +325,13 @@ const TaskProgress = {
         const wrap = document.getElementById("taskProgressWrap");
 
         if (!bar) return;
-        bar.style.width = "100%";
+        bar.style.transform = "scaleX(1)";
         pctEl.textContent = "100%";
-        if (eta) eta.textContent = "Done!";
+        if (eta) eta.textContent = "Done.";
 
         setTimeout(() => {
             if (wrap) wrap.style.display = "none";
-            if (bar) bar.style.width = "0%";
+            if (bar) bar.style.transform = "scaleX(0)";
         }, 900);
     },
 
@@ -518,18 +531,18 @@ function showAuthScreen() {
     document.getElementById("authScreen").style.display = "block";
     document.getElementById("mainApp").style.display = "none";
     document.documentElement.style.height = "480px";
-    document.documentElement.style.overflow = "hidden";
+    document.documentElement.style.overflow = "clip";
     document.body.style.height = "480px";
-    document.body.style.overflow = "hidden";
+    document.body.style.overflow = "clip";
 }
 
 async function showMainApp() {
     document.getElementById("authScreen").style.display = "none";
     document.getElementById("mainApp").style.display = "flex";
     document.documentElement.style.height = "480px";
-    document.documentElement.style.overflow = "hidden";
+    document.documentElement.style.overflow = "clip";
     document.body.style.height = "480px";
-    document.body.style.overflow = "hidden";
+    document.body.style.overflow = "clip";
 
     const userEmailEl = document.getElementById("userEmail");
     if (userEmailEl && currentUser) userEmailEl.textContent = currentUser.email;
@@ -803,6 +816,7 @@ async function handleGoogleLogin() {
 
     const btn = document.getElementById("googleLoginBtn") ||
                 document.getElementById("googleSignupBtn");
+    const googleBtnHTML = btn ? btn.innerHTML : "";
     if (btn) { btn.disabled = true; btn.textContent = "Connecting…"; }
 
     try {
@@ -858,12 +872,7 @@ async function handleGoogleLogin() {
     } finally {
         if (btn) {
             btn.disabled = false;
-            btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-            </svg> Continue with Google`;
+            btn.innerHTML = googleBtnHTML;
         }
     }
 }
@@ -892,11 +901,11 @@ async function renderKeyStatus() {
             chipEl.classList.remove("has-key");
             chipEl.classList.add("server-ai");
         }
-        const planName = (currentUser?.plan || "free").toUpperCase();
+        const planName = (currentUser?.plan || "free").toLowerCase();
         const used = currentUser?.weekly_usage ?? 0;
         const limit = currentUser?.weekly_limit ?? 5;
         if (chipText) {
-            chipText.textContent = `Server AI (${planName} · ${used}/${limit}/wk)`;
+            chipText.textContent = `Server AI, ${planName} plan, ${used} of ${limit} used this week`;
         }
         return;
     }
@@ -934,7 +943,7 @@ async function renderKeyStatus() {
             chipEl.classList.remove("server-ai");
             chipEl.classList.add("has-key");
         }
-        if (chipText)  chipText.textContent = `BYOK Active · ${label} (${masked})`;
+        if (chipText)  chipText.textContent = `Your key: ${label}, ${masked}`;
     } else {
         if (savedState) savedState.style.display = "none";
         if (formState)  formState.style.display  = "block";
@@ -944,7 +953,7 @@ async function renderKeyStatus() {
             chipEl.classList.remove("server-ai");
             chipEl.classList.remove("has-key");
         }
-        if (chipText)  chipText.textContent = "BYOK Enabled (No API key set)";
+        if (chipText)  chipText.textContent = "Your key: not set";
     }
 }
 
@@ -966,7 +975,7 @@ async function handleSaveApiKey() {
     }
 
     await setToStorage({ ai_provider: provider, ai_api_key: apiKey, ai_model: model || null });
-    if (succEl) { succEl.textContent = "Key saved!"; succEl.style.display = "block"; }
+    if (succEl) { succEl.textContent = "Key saved."; succEl.style.display = "block"; }
     setTimeout(() => { if (succEl) succEl.style.display = "none"; }, 2000);
     await renderKeyStatus();
 }
@@ -1002,14 +1011,14 @@ async function handleTestApiKey() {
         const data = await res.json();
         if (!res.ok) throw data;
         if (succEl) {
-            succEl.textContent = `✓ Connection successful! Using ${data.provider} · ${data.model}`;
+            succEl.textContent = `Connection successful. Using ${data.provider}, model ${data.model}.`;
             succEl.style.display = "block";
         }
     } catch (err) {
         const msg = err?.detail || err?.message || String(err);
         if (errEl) errEl.textContent = `Connection failed: ${msg}`;
     } finally {
-        if (testBtn) { testBtn.disabled = false; testBtn.textContent = "Test Connection"; }
+        if (testBtn) { testBtn.disabled = false; testBtn.textContent = "Test connection"; }
     }
 }
 
@@ -1095,12 +1104,7 @@ async function handleResumeUpload(e) {
         const aiSection = document.getElementById("aiKeySection");
         if (aiSection) {
             aiSection.scrollIntoView({ behavior: "smooth", block: "start" });
-            aiSection.style.transition = "box-shadow 0.3s ease";
-            aiSection.style.boxShadow = "0 0 0 3px rgba(0, 87, 255, 0.45)";
-            aiSection.style.borderRadius = "var(--radius)";
-            setTimeout(() => {
-                aiSection.style.boxShadow = "";
-            }, 1800);
+            flashSection(aiSection);
         }
         return;
     }
@@ -1149,9 +1153,9 @@ function showUploadingState(on, filename) {
     if (on) {
         targetLabel._originalHTML = targetLabel._originalHTML || targetLabel.innerHTML;
         targetLabel.innerHTML =
-            '<svg class="icon" viewBox="0 0 24 24" fill="currentColor" style="animation:pulse 1s infinite"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>' +
-            (filename ? `Uploading \u201c${filename}\u201d\u2026` : "Uploading\u2026");
-        targetLabel.style.opacity = "0.75";
+            SPINNER +
+            (filename ? `Uploading \u201c${escapeHtml(filename)}\u201d\u2026` : "Uploading\u2026");
+        targetLabel.setAttribute("aria-busy", "true");
         targetLabel.style.pointerEvents = "none";
     } else {
         // Restore whichever label(s) were mutated
@@ -1159,7 +1163,7 @@ function showUploadingState(on, filename) {
             if (el && el._originalHTML) {
                 el.innerHTML = el._originalHTML;
                 el._originalHTML = null;
-                el.style.opacity = "";
+                el.removeAttribute("aria-busy");
                 el.style.pointerEvents = "";
             }
         });
@@ -1236,8 +1240,7 @@ async function handleAddJobClick() {
     // Flash success label
     const addJobBtn = document.getElementById("addJobBtn");
     const originalText = addJobBtn.innerHTML;
-    addJobBtn.innerHTML =
-        '<svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M20 6L9 17l-5-5"/></svg>Added Successfully';
+    addJobBtn.innerHTML = icon("check") + "Added";
     addJobBtn.disabled = true;
     setTimeout(() => { addJobBtn.innerHTML = originalText; }, 2000);
 
@@ -1301,6 +1304,7 @@ async function handleResetToHome() {
 
     const optSection = document.getElementById("optimizedScoreSection");
     if (optSection) optSection.style.display = "none";
+    document.querySelector(".main-content")?.classList.remove("has-proof");
 
     const atsBreakdown = document.getElementById("atsBreakdownCard");
     if (atsBreakdown) atsBreakdown.style.display = "none";
@@ -1359,7 +1363,7 @@ async function handleResetToHome() {
     const mainContent = document.querySelector(".main-content");
     if (mainContent) mainContent.scrollTo({ top: 0, behavior: "smooth" });
 
-    showToast("Ready for your next application! 🚀", "info");
+    showToast("Ready for your next application.", "info");
 }
 
 /**
@@ -1377,13 +1381,13 @@ function handleReadMoreClick() {
     if (!isExpanded) {
         jobDescription.textContent = jobDescriptionFull;
         jobDescription.classList.add("expanded");
-        readMoreBtn.textContent = "Show Less";
+        readMoreBtn.textContent = "Show less";
         fadeOverlay.style.display = "none";
         isExpanded = true;
     } else {
         jobDescription.textContent = jobDescriptionFull.substring(0, 200) + "...";
         jobDescription.classList.remove("expanded");
-        readMoreBtn.textContent = "Show Full Description";
+        readMoreBtn.textContent = "Show full description";
         fadeOverlay.style.display = "block";
         isExpanded = false;
     }
@@ -1414,15 +1418,13 @@ async function handleAnalyzeClick() {
         const aiSection = document.getElementById("aiKeySection");
         if (aiSection) {
             aiSection.scrollIntoView({ behavior: "smooth", block: "start" });
-            aiSection.style.transition = "box-shadow 0.3s ease";
-            aiSection.style.boxShadow = "0 0 0 3px rgba(0, 87, 255, 0.45)";
-            setTimeout(() => { aiSection.style.boxShadow = ""; }, 1800);
+            flashSection(aiSection);
         }
         return;
     }
 
     btn.disabled = true;
-    showLoadingState(btn, "Analyzing...");
+    showLoadingState(btn, "Analyzing…");
     TaskProgress.start("Analyzing resume compatibility", 15_000);
 
     const { session_jd_cache_id } = await getFromStorage(["session_jd_cache_id"]);
@@ -1446,7 +1448,7 @@ function handleAnalyzeDone(atsScore, breakdown) {
     const btn = document.getElementById("analyzeBtn");
     if (btn) {
         btn.innerHTML = btn._origHTML ||
-            '<svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Analyze Compatibility';
+            icon("activity") + "Analyze compatibility";
         btn.disabled = false;
     }
     // Keep the plain fallback value in sync (used by optimise flow)
@@ -1512,7 +1514,7 @@ function renderATSBreakdown(data, prevScore) {
     const summaryBadge = document.getElementById("atsSummaryBadge");
     if (summaryBadge) {
         const level = data.match_level || scoreLabel(overall);
-        summaryBadge.textContent = "Score " + level;
+        summaryBadge.textContent = level;
         summaryBadge.className = "ats-match-badge ats-badge-" + level.toLowerCase();
     }
 
@@ -1532,7 +1534,7 @@ function renderATSBreakdown(data, prevScore) {
     // Improvement chip (only if prevScore provided)
     const chip = document.getElementById("atsImprovementChip");
     if (chip && prevScore != null && overall > prevScore) {
-        chip.textContent = `↑ ${overall - Math.round(prevScore)}% vs previous`;
+        chip.textContent = `+${overall - Math.round(prevScore)}% vs previous`;
         chip.style.display = "block";
     } else if (chip) {
         chip.style.display = "none";
@@ -1549,7 +1551,7 @@ function renderATSBreakdown(data, prevScore) {
         const barEl = document.getElementById(bar);
         const valEl = document.getElementById(val);
         const lblEl = document.getElementById(lbl);
-        if (barEl) { barEl.style.width = "0%"; setTimeout(() => { barEl.style.width = score + "%"; }, 80); }
+        if (barEl) { barEl.style.transform = "scaleX(0)"; setTimeout(() => { barEl.style.transform = `scaleX(${score / 100})`; }, 80); }
         if (valEl) valEl.textContent = score + "%";
         if (lblEl) { lblEl.textContent = scoreLabel(score); lblEl.className = `ats-sub-badge ats-badge-${scoreLabel(score).toLowerCase()}`; }
     });
@@ -1573,7 +1575,7 @@ function handleAnalyzeError(errMsg) {
     const btn = document.getElementById("analyzeBtn");
     if (btn) {
         btn.innerHTML = btn._origHTML ||
-            '<svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Analyze Compatibility';
+            icon("activity") + "Analyze compatibility";
         btn.disabled = false;
     }
     if (errMsg === "SESSION_EXPIRED") { handleLogout(); return; }
@@ -1594,9 +1596,7 @@ async function handleGenerateClick() {
         const aiSection = document.getElementById("aiKeySection");
         if (aiSection) {
             aiSection.scrollIntoView({ behavior: "smooth", block: "start" });
-            aiSection.style.transition = "box-shadow 0.3s ease";
-            aiSection.style.boxShadow = "0 0 0 3px rgba(0, 87, 255, 0.45)";
-            setTimeout(() => { aiSection.style.boxShadow = ""; }, 1800);
+            flashSection(aiSection);
         }
         return;
     }
@@ -1697,7 +1697,7 @@ function handleOptimizeError(errMsg) {
 }
 
 async function handlePreviewClick() {
-    showToast("Preview feature coming soon! 🚀", "info");
+    showToast("Preview is coming soon.", "info");
 }
 
 async function handleDownloadClick() {
@@ -1754,12 +1754,13 @@ async function handleDownloadClick() {
             banner.style.display = "block";
             banner.scrollIntoView({ behavior: "smooth", block: "nearest" });
         }
-        showToast("PDF downloaded! Click 'Back to Home' when ready for the next job.", "success");
+        showToast("PDF downloaded. Use Back to home when you are ready for the next job.", "success");
 
     } catch (err) {
         showError("Download failed: " + (err.message || String(err)));
     } finally {
         btn.innerHTML = originalHTML;
+        btn.removeAttribute("aria-busy");
         btn.disabled = false;
     }
 }
@@ -1818,12 +1819,13 @@ async function handleDownloadTexClick() {
             banner.style.display = "block";
             banner.scrollIntoView({ behavior: "smooth", block: "nearest" });
         }
-        showToast(".tex file downloaded! Click 'Back to Home' when ready for the next job.", "success");
+        showToast(".tex file downloaded. Use Back to home when you are ready for the next job.", "success");
 
     } catch (err) {
         showError("LaTeX download failed: " + (err.message || String(err)));
     } finally {
         btn.innerHTML = originalHTML;
+        btn.removeAttribute("aria-busy");
         btn.disabled = false;
     }
 }
@@ -1869,7 +1871,7 @@ function updateUsageMeter(daily, monthly, weekly, limit, plan = "free") {
     // Plan badge
     if (badgeEl) {
         const isPro = (plan === "pro");
-        badgeEl.textContent = isPro ? "PRO ✦" : "FREE";
+        badgeEl.textContent = isPro ? "Pro" : "Free";
         badgeEl.className   = isPro ? "plan-badge plan-badge--pro" : "plan-badge";
     }
 
@@ -1894,11 +1896,10 @@ function setGenerateButtonRunning(running) {
     const btn = document.getElementById("generateBtn");
     if (!btn) return;
     if (running) {
-        showLoadingState(btn, "Generating… (this takes ~30s)");
+        showLoadingState(btn, "Generating, this takes about 30 seconds…");
         btn.disabled = true;
     } else {
-        btn.innerHTML =
-            '<svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>Generate Optimized Resume';
+        btn.innerHTML = icon("zap") + "Generate optimized resume";
         btn.disabled = false;
     }
 }
@@ -1921,30 +1922,9 @@ function showToast(msg, type = "success") {
 
     const toast = document.createElement("div");
     toast.id = "sculpt-toast";
+    toast.className = `toast toast--${["success", "error", "info"].includes(type) ? type : "info"}`;
+    toast.setAttribute("role", type === "error" ? "alert" : "status");
     toast.textContent = msg;
-    const colors = {
-        success: "#22c55e",
-        error:   "#ef4444",
-        info:    "#0057FF",
-    };
-    Object.assign(toast.style, {
-        position:     "fixed",
-        top:          "12px",
-        left:         "50%",
-        transform:    "translateX(-50%)",
-        background:   colors[type] || colors.info,
-        color:        "#fff",
-        padding:      "10px 18px",
-        borderRadius: "10px",
-        fontSize:     "13px",
-        fontWeight:   "600",
-        zIndex:       "9999",
-        boxShadow:    "0 4px 20px rgba(0,0,0,0.3)",
-        maxWidth:     "320px",
-        textAlign:    "center",
-        animation:    "fadeSlideIn 0.25s ease",
-        whiteSpace:   "pre-wrap",
-    });
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 3500);
 }
@@ -1967,33 +1947,65 @@ function showAuthError(msg) {
     }
 }
 
+/* Counts a score from one value to another, for a short, restrained reading. Reduced motion lands on the value. */
+function countScore(el, from, to, delay, duration) {
+    const final = `${Math.round(to)}%`;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        el.textContent = final;
+        return;
+    }
+    el.textContent = `${Math.round(from)}%`;
+    let start = null;
+    setTimeout(() => {
+        const tick = (t) => {
+            if (start === null) start = t;
+            const p = Math.min(1, (t - start) / duration);
+            el.textContent = `${Math.round(from + (to - from) * (1 - Math.pow(1 - p, 3)))}%`;
+            if (p < 1) requestAnimationFrame(tick);
+            else el.textContent = final;
+        };
+        requestAnimationFrame(tick);
+    }, delay);
+}
+
 function showOptimizedScoreSection({ originalScore, optimizedScore, improvements }) {
     const originalScoreDisplay = document.getElementById("originalScoreDisplay");
     const optimizedScoreDisplay = document.getElementById("optimizedScore");
     const improvementTextEl = document.getElementById("improvementText");
-    const improvementIndicator = document.getElementById("improvementIndicator");
 
     originalScoreDisplay.textContent = `${Math.round(originalScore)}%`;
     optimizedScoreDisplay.textContent = `${Math.round(optimizedScore)}%`;
 
     const improvement = Math.round(optimizedScore - originalScore);
     if (improvement > 0) {
-        improvementTextEl.textContent = `Improved by ${improvement}%! 🎉`;
+        improvementTextEl.textContent = `+${improvement}% match`;
         improvementTextEl.className = "improvement-text positive";
-        improvementIndicator.style.background = "rgba(0, 212, 170, 0.1)";
     } else if (improvement === 0) {
         improvementTextEl.textContent = "Score maintained";
         improvementTextEl.className = "improvement-text neutral";
-        improvementIndicator.style.background = "rgba(136, 146, 176, 0.1)";
     } else {
         improvementTextEl.textContent = `Score decreased by ${Math.abs(improvement)}%`;
         improvementTextEl.className = "improvement-text negative";
-        improvementIndicator.style.background = "rgba(255, 107, 107, 0.1)";
     }
 
     const section = document.getElementById("optimizedScoreSection");
     section.style.display = "block";
-    section.style.animation = "slideIn 0.5s ease-out";
+
+    // Measure both scores on one 0 to 100 scale, and let the proof lead the work area
+    const onScale = (v) => Math.max(0, Math.min(100, Math.round(v)));
+    section.style.setProperty("--was", onScale(originalScore) / 100);
+    section.style.setProperty("--now", onScale(optimizedScore) / 100);
+    const rulerWas = document.getElementById("rulerWas");
+    const rulerNow = document.getElementById("rulerNow");
+    if (rulerWas) rulerWas.textContent = onScale(originalScore);
+    if (rulerNow) rulerNow.textContent = onScale(optimizedScore);
+    document.querySelector(".main-content")?.classList.add("has-proof");
+
+    // Play the reveal: the ruler guides draw, the new score counts up from the original
+    section.classList.remove("score-reveal");
+    void section.offsetWidth;
+    section.classList.add("score-reveal");
+    countScore(optimizedScoreDisplay, originalScore, optimizedScore, 450, 900);
 
     setTimeout(() => {
         section.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -2020,7 +2032,7 @@ function updateProgress(step) {
             const stepItem = stepIcon.parentElement;
             stepIcon.classList.remove("pending");
             stepIcon.classList.add("completed");
-            stepIcon.innerHTML = "✓";
+            stepIcon.innerHTML = icon("check");
             stepItem.classList.add("completed");
         }
     }
@@ -2028,9 +2040,8 @@ function updateProgress(step) {
 
 
 function showLoadingState(button, loadingText) {
-    const loadingIcon =
-        '<svg class="icon" viewBox="0 0 24 24" fill="currentColor" style="animation: pulse 1s infinite;"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
-    button.innerHTML = `${loadingIcon}${loadingText}`;
+    button.setAttribute("aria-busy", "true");
+    button.innerHTML = `${SPINNER}${loadingText}`;
 }
 
 // ============================
@@ -2096,7 +2107,7 @@ async function handleFetchFromPageClick() {
             jdText = result?.text;
         } catch (err) {
             fetchBtn.disabled = false;
-            fetchBtn.textContent = "Use from Page";
+            fetchBtn.textContent = "Use from page";
             showError("Could not fetch job description: " + (err?.message || String(err)));
             return;
         }
@@ -2138,12 +2149,13 @@ function renderChangelog(changes) {
 
     let criticalCount = 0;
 
-    for (const change of changes) {
+    for (const [index, change] of changes.entries()) {
         const { severity, label, items } = change;
         if (severity === "critical") criticalCount++;
 
         const li = document.createElement("li");
         li.className = `changelog-item ${severity}`;
+        li.style.setProperty("--i", Math.min(index, 8));
 
         // Header row: dot + text
         const header = document.createElement("div");
@@ -2252,7 +2264,7 @@ async function handleExplainChangesClick() {
         return;
     }
 
-    loading.style.display = "block";
+    loading.style.display = "flex";
     content.style.display = "none";
 
     try {
@@ -2318,36 +2330,40 @@ function renderExplanation(data) {
     if (enhancements.length > 0) {
         enhancements.forEach(item => {
             const card = document.createElement("div");
-            card.style.cssText = "background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:8px 10px; font-size:11px;";
+            card.className = "exp-card";
 
             const secTitle = document.createElement("div");
-            secTitle.style.cssText = "font-weight:700; color:var(--text); margin-bottom:4px; font-size:11px;";
-            secTitle.textContent = item.section || "Role Enhancement";
+            secTitle.className = "exp-card__title";
+            secTitle.textContent = item.section || "Role enhancement";
             card.appendChild(secTitle);
 
             if (item.original) {
                 const origDiv = document.createElement("div");
-                origDiv.style.cssText = "color:var(--muted); text-decoration:line-through; margin-bottom:3px; opacity:0.8; font-size:10.5px;";
-                origDiv.textContent = item.original;
+                origDiv.className = "exp-card__old";
+                const origText = document.createElement("span");
+                origText.textContent = item.original;
+                origDiv.appendChild(origText);
                 card.appendChild(origDiv);
             }
 
             const optDiv = document.createElement("div");
-            optDiv.style.cssText = "color:#0057FF; font-weight:600; margin-bottom:4px; font-size:11px;";
-            optDiv.textContent = item.optimized;
+            optDiv.className = "exp-card__new";
+            const optText = document.createElement("span");
+            optText.textContent = item.optimized;
+            optDiv.appendChild(optText);
             card.appendChild(optDiv);
 
             if (item.reason) {
                 const reasonDiv = document.createElement("div");
-                reasonDiv.style.cssText = "font-size:10px; color:var(--muted); font-style:italic; background:var(--surface); padding:4px 6px; border-radius:4px; border:1px solid rgba(0,0,0,0.04);";
-                reasonDiv.textContent = `💡 ${item.reason}`;
+                reasonDiv.className = "exp-card__why";
+                reasonDiv.textContent = item.reason;
                 card.appendChild(reasonDiv);
             }
 
             bulletsList.appendChild(card);
         });
     } else {
-        bulletsList.innerHTML = "<div style='font-size:11px; color:var(--muted);'>All bullets aligned with role criteria.</div>";
+        bulletsList.innerHTML = '<div class="exp-block__text">All bullets already align with the role.</div>';
     }
 
     // 3. Skills
@@ -2362,7 +2378,7 @@ function renderExplanation(data) {
     // 4. Preservation
     const presText = document.getElementById("expPreservationText");
     if (presText) {
-        presText.textContent = data.preservation_notes || "All education, roles, and factual history were preserved verbatim.";
+        presText.textContent = data.preservation_notes || "Education, roles and factual history were kept as written.";
     }
 
     const panel = document.getElementById("explanationPanel");
@@ -2388,28 +2404,12 @@ function showVerificationPendingScreen(email) {
     document.getElementById("mainApp").style.display = "none";
 
     authScreen.innerHTML = `
-      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
-                  height:100%;padding:32px 24px;text-align:center;gap:16px;">
-        <div style="font-size:48px;">📬</div>
-        <h2 style="color:var(--text);margin:0;font-size:18px;font-weight:700;">
-          Check your inbox
-        </h2>
-        <p style="color:var(--muted);margin:0;line-height:1.6;font-size:13px;max-width:280px;">
-          We've sent a verification link to<br>
-          <strong style="color:var(--accent);">${escapeHtml(email)}</strong>.<br><br>
-          Click the link in the email to activate your account, then come back and sign in.
-        </p>
-        <button id="resendVerifyBtn"
-                style="background:var(--accent);border:none;color:white;
-                       border-radius:var(--radius);padding:10px 24px;cursor:pointer;font-size:13px;
-                       font-weight:600;margin-top:8px;box-shadow:0 2px 8px rgba(0,87,255,0.25);">
-          Resend Email
-        </button>
-        <button id="backToLoginBtn"
-                style="background:transparent;border:none;color:var(--muted2);
-                       cursor:pointer;font-size:12px;text-decoration:underline;">
-          Back to Sign In
-        </button>
+      <div class="verify-screen">
+        ${icon("mail")}
+        <h2>Check your inbox</h2>
+        <p>We sent a verification link to <strong>${escapeHtml(email)}</strong>. Open it to activate your account, then come back and sign in.</p>
+        <button type="button" id="resendVerifyBtn" class="btn btn-primary">Resend email</button>
+        <button type="button" id="backToLoginBtn" class="link-btn">Back to sign in</button>
       </div>`;
 
     document.getElementById("resendVerifyBtn")?.addEventListener("click", handleResendVerification);
@@ -2430,27 +2430,11 @@ function showUnverifiedBanner() {
 
     const banner = document.createElement("div");
     banner.id = "unverifiedBanner";
-    banner.style.cssText = `
-        background: #fffbeb;
-        border: 1px solid #fef3c7;
-        border-radius: 8px;
-        padding: 10px 14px;
-        margin: 0 0 12px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-        font-size: 12px;
-        color: #b45309;
-    `;
+    banner.className = "banner";
+    banner.setAttribute("role", "status");
     banner.innerHTML = `
-        <span>⚠️ Please verify your email to use all features.
-          <button id="resendVerifyBannerBtn"
-                  style="background:transparent;border:none;color:var(--accent);
-                         cursor:pointer;font-size:12px;text-decoration:underline;padding:0;font-weight:600;">
-            Resend
-          </button>
-        </span>`;
+        <span class="banner__text">${icon("alert")}Verify your email to use all features.</span>
+        <button type="button" id="resendVerifyBannerBtn" class="link-btn">Resend</button>`;
 
     const mainApp = document.getElementById("mainApp");
     if (mainApp) mainApp.prepend(banner);
@@ -2475,12 +2459,12 @@ async function handleResendVerification() {
         if (!res.ok) {
             showToast(data.detail || "Could not resend email. Please try again.", "error");
         } else {
-            showToast("✅ Verification email sent! Check your inbox.", "success");
+            showToast("Verification email sent. Check your inbox.", "success");
         }
     } catch {
         showToast("Network error. Please try again.", "error");
     } finally {
-        if (btn) { btn.disabled = false; btn.textContent = btn.id === "resendVerifyBtn" ? "Resend Email" : "Resend"; }
+        if (btn) { btn.disabled = false; btn.textContent = btn.id === "resendVerifyBtn" ? "Resend email" : "Resend"; }
     }
 }
 
@@ -2515,7 +2499,7 @@ async function loadHistory(showLoading = false) {
     if (!list || !countBadge || !panel) return;
 
     if (showLoading) {
-        list.innerHTML = `<div style="text-align:center;padding:16px;color:var(--muted);font-size:12px;">Loading history...</div>`;
+        list.innerHTML = `<div class="history-empty" role="status">Loading history…</div>`;
     }
 
     try {
@@ -2543,9 +2527,8 @@ async function loadHistory(showLoading = false) {
             countBadge.style.display = "none";
         }
     } catch (err) {
-        console.error("Error loading history:", err);
         if (list) {
-            list.innerHTML = `<div style="text-align:center;padding:16px;color:var(--danger);font-size:12px;">Failed to load history.</div>`;
+            list.innerHTML = `<div class="history-error" role="alert">Could not load history. Reopen the panel to retry.</div>`;
         }
     }
 }
@@ -2578,27 +2561,23 @@ function renderHistoryList(history) {
 
         div.innerHTML = `
             <div class="history-item-details">
-                <div class="history-item-title" title="${escapeHtml(item.job_title || 'Optimized Resume')}">
-                    ${escapeHtml(item.job_title || 'Optimized Resume')}
+                <div class="history-item-title" title="${escapeHtml(item.job_title || 'Optimized resume')}">
+                    ${escapeHtml(item.job_title || 'Optimized resume')}
                 </div>
                 <div class="history-item-meta">
                     <span class="history-item-date">${escapeHtml(dateStr)}</span>
                     <span class="history-item-scores">
-                        Score: <strong style="color:var(--text);">${Number(item.original_ats_score) || 0}%</strong> 
-                        → <strong style="color:var(--accent);">${Number(item.optimized_ats_score) || 0}%</strong>
+                        <s>${Number(item.original_ats_score) || 0}%</s>
+                        <strong>${Number(item.optimized_ats_score) || 0}%</strong>
                         <span class="history-score-badge ${diffClass}">${diffText} pts</span>
                     </span>
                 </div>
             </div>
-            <button class="history-download-btn" data-id="${escapeHtml(String(item.id))}" title="Download PDF">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="7 10 12 15 17 10"/>
-                    <line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
+            <button type="button" class="history-download-btn" data-id="${escapeHtml(String(item.id))}" title="Download PDF" aria-label="Download PDF">
+                ${icon("download")}
             </button>
         `;
-        
+
         // Add event listener for download
         div.querySelector(".history-download-btn").addEventListener("click", async function(e) {
             e.stopPropagation();
@@ -2615,11 +2594,7 @@ async function downloadHistoryPDF(recordId, btnElement) {
     btnElement.disabled = true;
     
     // Show spinner/loading inside the small button
-    btnElement.innerHTML = `
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;animation:spin 1s linear infinite;">
-            <circle cx="12" cy="12" r="10" stroke-dasharray="16" />
-        </svg>
-    `;
+    btnElement.innerHTML = SPINNER;
 
     try {
         const { access_token } = await getFromStorage(["access_token"]);
@@ -2655,9 +2630,8 @@ async function downloadHistoryPDF(recordId, btnElement) {
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
         
-        showToast("✅ Downloaded past optimized resume!", "success");
+        showToast("Downloaded.", "success");
     } catch (err) {
-        console.error("Error downloading history PDF:", err);
         showToast("Failed to download PDF. Please try again.", "error");
     } finally {
         btnElement.disabled = false;
