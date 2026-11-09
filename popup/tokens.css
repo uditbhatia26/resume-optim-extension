@@ -1,22 +1,37 @@
+/* Sculpt popup tokens, shared with the landing page: a cool paper, one ink, one orange,
+   an editorial serif for headings, a sans for reading and a mono for technical labels. */
 :root {
   color-scheme: light;
   --space-3xs: 2px; --space-2xs: 4px; --space-xs: 8px; --space-sm: 12px; --space-md: 16px; --space-lg: 24px; --space-xl: 40px; --space-2xl: 64px; --space-3xl: 96px; --space-4xl: 144px;
-  --text-xs: 0.75rem; --text-sm: 0.875rem; --text-md: 1rem; --text-lg: 1.2rem; --text-xl: 1.44rem; --text-2xl: 1.728rem; --text-3xl: 2.074rem;
-  --text-display-s: 1.44rem; --text-display: 1.728rem; --text-section: 1.2rem; --text-title: 1rem; --text-lead: 1rem;
+  --text-2xs: 0.6875rem; --text-xs: 0.75rem; --text-sm: 0.875rem; --text-md: 1rem; --text-lg: 1.2rem; --text-xl: 1.5rem; --text-2xl: 1.875rem; --text-3xl: 2.25rem;
+  --text-display-s: 1.5rem; --text-display: 1.875rem; --text-section: 1.5rem; --text-title: 1rem; --text-lead: 1rem;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1); --ease-in: cubic-bezier(0.7, 0, 0.84, 0); --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-  --dur-micro: 120ms; --dur-short: 220ms; --dur-long: 420ms;
-  --color-error: oklch(52% 0.19 27); --color-success: oklch(50% 0.12 150);
+  --dur-micro: 120ms; --dur-short: 200ms; --dur-long: 420ms;
   --container: 1440px; --gutter: 64px; --gap-columns: 32px; --section-gap-s: 120px; --section-gap: 144px; --section-gap-l: 176px;
   --z-base: 1; --z-raised: 10; --z-dropdown: 100; --z-sticky: 200; --z-sticky-nav: 300; --z-modal: 400; --z-toast: 500; --z-tooltip: 600;
-  --color-paper: oklch(97.2% 0.006 215); --color-paper-2: oklch(94% 0.009 215); --color-paper-3: oklch(90.5% 0.011 215); --color-paper-hi: oklch(99% 0.004 215);
-  --color-ink: oklch(16% 0.032 250); --color-ink-2: oklch(34% 0.022 245); --color-muted: oklch(49% 0.018 240);
-  --color-rule: oklch(84% 0.010 225);
-  --color-accent: oklch(68% 0.172 50); --color-accent-ink: oklch(16% 0.032 250); --color-focus: oklch(52% 0.15 48);
-  --color-dot: color-mix(in oklab, var(--color-ink) 20%, transparent); --color-mark: color-mix(in oklab, var(--color-ink) 72%, transparent);
-  --font-display: "Hedvig Letters Serif", ui-serif, Georgia, serif; --font-body: "Geist", ui-sans-serif, system-ui, sans-serif;
-  --font-outlier: "Sofia Sans Extra Condensed", "Arial Narrow", ui-sans-serif, sans-serif;
-  --radius-card: 3px; --radius-pill: 3px; --rule-hair: 1px;
+
+  --color-paper: #F3F5F1;
+  --color-paper-2: #E9EDE9;
+  --color-paper-3: #DDE3DE;
+  --color-paper-hi: #FAFCF9;
+  --color-ink: #17211F;
+  --color-ink-2: #36423F;
+  --color-muted: #66716D;
+  --color-rule: #BEC7C1;
+  --color-rule-soft: #D9DFDA;
+  --color-accent: #E97832;
+  --color-accent-hover: #E36D24;
+  --color-accent-soft: rgb(233 120 50 / 0.18);
+  --color-accent-ink: #17211F;
+  --color-focus: #17211F;
+  --color-error: #B4232A; --color-success: #13703B;
+
+  --font-display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --font-body: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --radius-card: 2px; --radius-pill: 2px; --rule-hair: 1px;
   --shadow-card: none;
-  --shadow-sheet: 1px 2px 0 color-mix(in oklab, var(--color-ink) 7%, transparent), 10px 18px 36px -14px color-mix(in oklab, var(--color-ink) 32%, transparent);
-  --tracking-display: -0.022em; --display-weight: 400;
+  --shadow-sheet: 0 1px 0 rgb(23 33 31 / 0.04), 0 18px 32px -26px rgb(23 33 31 / 0.35);
+  --tracking-display: -0.015em; --display-weight: 400;
 }
