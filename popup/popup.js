@@ -1740,7 +1740,7 @@ async function handleDownloadClick() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = "optimized_resume.pdf";
+        a.download = filenameFromResponse(res, "resume.pdf");
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -1805,7 +1805,7 @@ async function handleDownloadTexClick() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = "optimized_resume.tex";
+        a.download = filenameFromResponse(res, "resume.tex");
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -2627,16 +2627,7 @@ async function downloadHistoryPDF(recordId, btnElement) {
 
         const blob = await res.blob();
         
-        // Retrieve filename from content-disposition header if available
-        let filename = "optimized_resume.pdf";
-        const disposition = res.headers.get("content-disposition");
-        if (disposition && disposition.indexOf("attachment") !== -1) {
-            const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
-            const matches = filenameRegex.exec(disposition);
-            if (matches != null && matches[1]) {
-                filename = matches[1].replace(/['"]/g, '');
-            }
-        }
+        const filename = filenameFromResponse(res, "resume.pdf");
 
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -2656,6 +2647,20 @@ async function downloadHistoryPDF(recordId, btnElement) {
         btnElement.disabled = false;
         btnElement.innerHTML = originalHTML;
     }
+}
+
+/**
+ * The filename the server chose ("Jane_Doe_resume.pdf"), from Content-Disposition.
+ * Prefers filename*= (keeps non-Latin names intact) over the plain filename=.
+ */
+function filenameFromResponse(res, fallback) {
+    const header = res.headers.get("content-disposition") || "";
+    const star = /filename\*=UTF-8''([^;]+)/i.exec(header);
+    if (star) {
+        try { return decodeURIComponent(star[1].trim()); } catch { /* fall through to filename= */ }
+    }
+    const plain = /filename="?([^";]+)"?/i.exec(header);
+    return plain ? plain[1].trim() : fallback;
 }
 
 function escapeHtml(str) {
