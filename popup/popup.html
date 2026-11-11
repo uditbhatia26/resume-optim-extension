@@ -121,6 +121,11 @@
                 <svg class="icon" aria-hidden="true"><use href="#i-key"/></svg>
                 <span id="aiKeyChipText">No API key set</span>
             </div>
+            <div class="usage-meter" id="usageMeter" role="meter" aria-label="Generations used this week"
+                aria-valuemin="0" aria-valuemax="5" aria-valuenow="0" hidden>
+                <span class="usage-meter__count" id="usageMeterCount">0 of 5 this week</span>
+                <span class="usage-meter__track" aria-hidden="true"><i></i></span>
+            </div>
             <button type="button" class="ai-key-change-btn" id="aiKeyChangeBtn">Configure</button>
         </div>
 
@@ -171,11 +176,11 @@
                         <div class="ai-key-field">
                             <label class="ai-key-label" for="providerSelect">Provider</label>
                             <select class="ai-key-select" id="providerSelect">
-                                <option value="openai">OpenAI (GPT-4o-mini)</option>
-                                <option value="anthropic">Anthropic (Claude Haiku)</option>
-                                <option value="google">Google Gemini (Flash)</option>
-                                <option value="groq">Groq (Llama 3.3 70B)</option>
-                                <option value="openrouter">OpenRouter (Custom)</option>
+                                <option value="openai">OpenAI (GPT-6 Luna)</option>
+                                <option value="anthropic">Anthropic (Claude Haiku 5.5)</option>
+                                <option value="google">Google Gemini (3.8 Flash)</option>
+                                <option value="groq">Groq (GPT-OSS 120B)</option>
+                                <option value="openrouter">OpenRouter (name a model)</option>
                             </select>
                         </div>
                         <div class="ai-key-field">
@@ -381,6 +386,8 @@
                         <option value="compact_onepage">Compact (Ultra-Dense 1-Page)</option>
                     </select>
                 </div>
+
+                <p class="usage-limit-note" id="usageLimitNote" role="status" hidden></p>
 
                 <button type="button" class="btn btn-primary" id="generateBtn" disabled>
                     <svg class="icon" aria-hidden="true"><use href="#i-zap"/></svg>

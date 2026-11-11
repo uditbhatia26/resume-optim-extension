@@ -648,6 +648,30 @@ function toggleAuthForm(form) {
     }
 }
 
+/** Store a signed-in user from any auth response (login, signup, Google) and set currentUser. */
+async function rememberSignedInUser(data) {
+    const user = {
+        email:           data.email,
+        has_resume:      !!data.has_resume,
+        resume_filename: data.resume_filename || null,
+        plan:            data.plan ?? "free",
+        email_verified:  !!data.email_verified,
+        is_byok_allowed: data.is_byok_allowed ?? false,
+        is_admin:        data.is_admin ?? false,
+        weekly_usage:    data.weekly_usage ?? 0,
+        weekly_limit:    data.weekly_limit ?? 5,
+        daily_usage:     data.daily_usage ?? 0,
+        monthly_usage:   data.monthly_usage ?? 0,
+    };
+    await setToStorage({
+        access_token: data.access_token,
+        user_email:   data.email,
+        user_id:      data.user_id,
+        ...user,
+    });
+    currentUser = user;
+}
+
 async function handleLogin(e) {
     e.preventDefault();
     const email = document.getElementById("loginEmail").value.trim();
@@ -671,34 +695,7 @@ async function handleLogin(e) {
         const data = await res.json();
         if (!res.ok) throw data;
 
-        await setToStorage({
-            access_token: data.access_token,
-            user_email: data.email,
-            user_id: data.user_id,
-            has_resume: data.has_resume,
-            resume_filename: data.resume_filename || null,
-            plan: data.plan,
-            email_verified: data.email_verified,
-            is_byok_allowed: data.is_byok_allowed ?? false,
-            is_admin: data.is_admin ?? false,
-            weekly_usage: data.weekly_usage,
-            weekly_limit: data.weekly_limit,
-            daily_usage: data.daily_usage,
-            monthly_usage: data.monthly_usage,
-        });
-        currentUser = {
-            email: data.email,
-            has_resume: data.has_resume,
-            resume_filename: data.resume_filename || null,
-            plan: data.plan,
-            email_verified: data.email_verified,
-            is_byok_allowed: data.is_byok_allowed ?? false,
-            is_admin: data.is_admin ?? false,
-            weekly_usage: data.weekly_usage,
-            weekly_limit: data.weekly_limit,
-            daily_usage: data.daily_usage,
-            monthly_usage: data.monthly_usage,
-        };
+        await rememberSignedInUser(data);
         showMainApp();
     } catch (error) {
         errorEl.textContent = apiErrorMessage(error, "Login failed. Please try again.");
@@ -755,32 +752,7 @@ async function handleSignup(e) {
         const data = await res.json();
         if (!res.ok) throw data;
 
-        await setToStorage({
-            access_token: data.access_token,
-            user_email: data.email,
-            user_id: data.user_id,
-            has_resume: data.has_resume,
-            resume_filename: data.resume_filename || null,
-            email_verified: data.email_verified,
-            is_byok_allowed: data.is_byok_allowed ?? false,
-            is_admin: data.is_admin ?? false,
-            weekly_usage: data.weekly_usage,
-            weekly_limit: data.weekly_limit,
-            daily_usage: data.daily_usage,
-            monthly_usage: data.monthly_usage,
-        });
-        currentUser = {
-            email: data.email,
-            has_resume: data.has_resume,
-            resume_filename: data.resume_filename || null,
-            email_verified: data.email_verified,
-            is_byok_allowed: data.is_byok_allowed ?? false,
-            is_admin: data.is_admin ?? false,
-            weekly_usage: data.weekly_usage,
-            weekly_limit: data.weekly_limit,
-            daily_usage: data.daily_usage,
-            monthly_usage: data.monthly_usage,
-        };
+        await rememberSignedInUser(data);
         // Show verification-pending screen instead of main app
         showVerificationPendingScreen(data.email);
     } catch (error) {
@@ -795,84 +767,98 @@ async function handleLogout() {
     // Also clear the saved API key on logout
     await chrome.storage.local.remove(["ai_provider", "ai_api_key", "ai_model"]);
     await chrome.storage.local.clear();
+    try { await chrome.identity?.clearAllCachedAuthTokens?.(); } catch { /* not signed in with Google */ }
     currentUser = null;
     showAuthScreen();
 }
 
 /**
- * Google OAuth flow — Chrome Extension type.
- * Uses chrome.identity.getAuthToken() to get an access token directly
- * (no code exchange, no client secret needed in the extension).
- * The backend verifies the token against Google's userinfo endpoint.
+ * Google sign-in with chrome.identity.getAuthToken(). The backend checks the token was
+ * issued to this extension's OAuth client before signing anyone in.
+ *
+ * getAuthToken only works when the extension ID matches the one registered for
+ * manifest.oauth2.client_id in Google Cloud, and only in Google Chrome.
  */
-async function handleGoogleLogin() {
-    // Guard: ensure the Client ID has been configured in manifest.json
-    const manifest  = chrome.runtime.getManifest();
-    const clientId  = manifest.oauth2?.client_id;
+function getGoogleToken() {
+    return new Promise((resolve, reject) => {
+        chrome.identity.getAuthToken({ interactive: true }, (result) => {
+            // Chrome returns a string in older versions and { token } in newer ones
+            const token = typeof result === "string" ? result : result?.token;
+            if (chrome.runtime.lastError || !token) {
+                reject(new Error(chrome.runtime.lastError?.message || "Google sign-in was cancelled."));
+            } else {
+                resolve(token);
+            }
+        });
+    });
+}
+
+function forgetGoogleToken(token) {
+    return new Promise((resolve) => {
+        try { chrome.identity.removeCachedAuthToken({ token }, () => resolve()); }
+        catch { resolve(); }
+    });
+}
+
+function postGoogleToken(token) {
+    return fetch(`${API_BASE}/auth/google`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ access_token: token }),
+    });
+}
+
+/** Turn Chrome identity and backend errors into something a person can act on. */
+function googleErrorMessage(err) {
+    const msg = String(err?.detail || err?.message || err || "");
+    const lower = msg.toLowerCase();
+    if (lower.includes("not supported")) {
+        return "Google sign-in needs Google Chrome. Sign in with email and password instead.";
+    }
+    if (lower.includes("client id") || lower.includes("bad client") || lower.includes("oauth2 client")) {
+        return "Google sign-in isn't set up for this copy of the extension (its ID doesn't match the Google OAuth client).";
+    }
+    if (lower.includes("did not approve") || lower.includes("cancel") || lower.includes("not granted")) {
+        return "Google sign-in was cancelled.";
+    }
+    return msg ? `Google sign-in failed: ${msg}` : "Google sign-in failed. Please try again.";
+}
+
+async function handleGoogleLogin(e) {
+    const clientId = chrome.runtime.getManifest().oauth2?.client_id;
     if (!clientId || clientId.startsWith("YOUR_")) {
-        showAuthError("Google sign-in is not configured yet. Contact support.");
+        showAuthError("Google sign-in is not configured yet.");
+        return;
+    }
+    if (!chrome.identity?.getAuthToken) {
+        showAuthError(googleErrorMessage("not supported"));
         return;
     }
 
-    const btn = document.getElementById("googleLoginBtn") ||
-                document.getElementById("googleSignupBtn");
-    const googleBtnHTML = btn ? btn.innerHTML : "";
+    const btn = e?.currentTarget || document.getElementById("googleLoginBtn");
+    const originalHTML = btn ? btn.innerHTML : "";
     if (btn) { btn.disabled = true; btn.textContent = "Connecting…"; }
 
     try {
-        // 1. Get an access token from Chrome's identity API
-        const accessToken = await new Promise((resolve, reject) => {
-            chrome.identity.getAuthToken({ interactive: true }, (token) => {
-                if (chrome.runtime.lastError || !token) {
-                    reject(new Error(chrome.runtime.lastError?.message || "OAuth cancelled"));
-                } else {
-                    resolve(token);
-                }
-            });
-        });
-
-        // 2. Send the access token to our backend — it verifies with Google
-        const res = await fetch(`${API_BASE}/auth/google`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ access_token: accessToken }),
-        });
-        const data = await res.json();
+        let token = await getGoogleToken();
+        let res = await postGoogleToken(token);
+        if (res.status === 401) {
+            // Chrome can hand back a cached token Google has since revoked: drop it and try once more
+            await forgetGoogleToken(token);
+            token = await getGoogleToken();
+            res = await postGoogleToken(token);
+        }
+        const data = await res.json().catch(() => ({}));
         if (!res.ok) throw data;
 
-        // 3. Store session exactly like a regular login
-        await setToStorage({
-            access_token:    data.access_token,
-            user_email:      data.email,
-            user_id:         data.user_id,
-            has_resume:      data.has_resume,
-            resume_filename: null,
-            plan:            data.plan,
-            email_verified:  data.email_verified,
-            weekly_usage:    data.weekly_usage,
-            weekly_limit:    data.weekly_limit,
-            daily_usage:     data.daily_usage,
-            monthly_usage:   data.monthly_usage,
-        });
-        currentUser = {
-            email:          data.email,
-            has_resume:     data.has_resume,
-            resume_filename: null,
-            email_verified: data.email_verified,
-            plan:           data.plan,
-            weekly_usage:   data.weekly_usage,
-            weekly_limit:   data.weekly_limit,
-            daily_usage:    data.daily_usage,
-            monthly_usage:  data.monthly_usage,
-        };
+        await rememberSignedInUser(data);
         showMainApp();
     } catch (err) {
-        const msg = err?.detail || err?.message || String(err);
-        showError(`Google sign-in failed: ${msg}`);
+        showAuthError(googleErrorMessage(err));
     } finally {
         if (btn) {
             btn.disabled = false;
-            btn.innerHTML = googleBtnHTML;
+            btn.innerHTML = originalHTML;
         }
     }
 }
@@ -901,16 +887,12 @@ async function renderKeyStatus() {
             chipEl.classList.remove("has-key");
             chipEl.classList.add("server-ai");
         }
-        const planName = (currentUser?.plan || "free").toLowerCase();
-        const used = currentUser?.weekly_usage ?? 0;
-        const limit = currentUser?.weekly_limit ?? 5;
-        if (chipText) {
-            chipText.textContent = `Server AI, ${planName} plan, ${used} of ${limit} used this week`;
-        }
+        renderUsage();
         return;
     }
 
-    // BYOK-entitled user: show custom key drawer & status
+    // BYOK-entitled user: show custom key drawer & status (their own key, so no weekly quota)
+    renderUsage();
     if (aiSection) aiSection.style.display = "block";
     const changeBtn = document.getElementById("aiKeyChangeBtn");
     if (changeBtn) changeBtn.style.display = "";
@@ -1589,6 +1571,15 @@ function handleAnalyzeError(errMsg) {
  * OPTIMIZE_DONE / OPTIMIZE_ERROR messages pushed by the worker.
  */
 async function handleGenerateClick() {
+    // Guard: the week's generations are used up (the server enforces this too)
+    if (quotaReached()) {
+        renderUsage();
+        const note = document.getElementById("usageLimitNote");
+        note?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        flashSection(note);
+        return;
+    }
+
     // Guard: API key must be configured if user has BYOK entitlement
     const keyCheck = await getFromStorage(["ai_provider", "ai_api_key"]);
     if (currentUser?.is_byok_allowed && (!keyCheck.ai_provider || !keyCheck.ai_api_key)) {
@@ -1693,6 +1684,13 @@ function handleOptimizeDone(data) {
 function handleOptimizeError(errMsg) {
     TaskProgress.stop();
     setGenerateButtonRunning(false);
+    // "Weekly generation limit reached (5/5)": the week is used up, so show the meter full
+    const limitHit = /limit reached \((\d+)\/(\d+)\)/i.exec(errMsg || "");
+    if (limitHit && currentUser) {
+        updateUsageMeter(currentUser.daily_usage ?? 0, currentUser.monthly_usage ?? 0,
+            Number(limitHit[1]), Number(limitHit[2]), currentUser.plan ?? "free");
+        return;
+    }
     showError("Optimization failed: " + errMsg);
 }
 
@@ -1844,47 +1842,68 @@ async function handleRecalculateClick() {
 // ============================
 
 /**
- * Update the usage meter strip with the latest counts.
-/**
+ * Record the latest usage counts (from login, /auth/me or an optimize response) and redraw.
  * @param {number} daily    - resumes generated today
  * @param {number} monthly  - resumes generated this calendar month
- * @param {number} weekly   - resumes generated this week (for limit display)
+ * @param {number} weekly   - resumes generated this week
  * @param {number} limit    - weekly plan limit
  * @param {string} plan     - "free" | "pro"
  */
 function updateUsageMeter(daily, monthly, weekly, limit, plan = "free") {
+    const counts = { daily_usage: daily, monthly_usage: monthly, weekly_usage: weekly, weekly_limit: limit, plan };
+    if (currentUser) Object.assign(currentUser, counts);
+    setToStorage(counts).catch(() => { });
+    renderUsage();
+}
+
+/** True when the server's AI is in use and this week's generations are used up. */
+function quotaReached() {
+    if (!currentUser || currentUser.is_byok_allowed) return false;
+    return (currentUser.weekly_usage ?? 0) >= (currentUser.weekly_limit ?? 5);
+}
+
+/** The next Monday (UTC), when the weekly count resets on the server. */
+function quotaResetLabel() {
+    const now = new Date();
+    const daysToMonday = ((8 - now.getUTCDay()) % 7) || 7;
+    const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysToMonday));
+    return monday.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "short", timeZone: "UTC" });
+}
+
+/** Draw the weekly meter in the status bar and the limit note by the Generate button. */
+function renderUsage() {
     const meter = document.getElementById("usageMeter");
-    if (!meter) return;
+    const note  = document.getElementById("usageLimitNote");
+    const chip  = document.getElementById("aiKeyChipText");
+    const serverAi = !!currentUser && !currentUser.is_byok_allowed;
 
-    const todayEl   = document.getElementById("usageToday");
-    const monthEl   = document.getElementById("usageMonth");
-    const weeklyEl  = document.getElementById("usageWeekly");
-    const limitEl   = document.getElementById("usageWeeklyLimit");
-    const badgeEl   = document.getElementById("planBadge");
-    const ctaBanner = document.getElementById("upgradeCta");
-
-    if (todayEl)  todayEl.textContent = daily;
-    if (monthEl)  monthEl.textContent = monthly;
-    if (weeklyEl) weeklyEl.firstChild.textContent = weekly + " ";
-    if (limitEl)  limitEl.textContent = `/ ${limit}`;
-
-    // Plan badge
-    if (badgeEl) {
-        const isPro = (plan === "pro");
-        badgeEl.textContent = isPro ? "Pro" : "Free";
-        badgeEl.className   = isPro ? "plan-badge plan-badge--pro" : "plan-badge";
+    if (meter) meter.hidden = !serverAi;
+    if (!serverAi) {
+        if (note) note.hidden = true;
+        return;
     }
 
-    // Upgrade CTA — only for free users who have exhausted their weekly limit
-    if (ctaBanner) {
-        const limitHit = (plan !== "pro") && (weekly >= limit);
-        ctaBanner.style.display = limitHit ? "flex" : "none";
-        // Point upgrade link to the dashboard (opens in a new tab)
-        const upgradeBtn = document.getElementById("upgradeCtaBtn");
-        if (upgradeBtn) upgradeBtn.href = DASHBOARD_URL;
-    }
+    const used  = currentUser.weekly_usage ?? 0;
+    const limit = currentUser.weekly_limit ?? 5;
+    const plan  = (currentUser.plan || "free").toLowerCase();
+    const full  = used >= limit;
 
-    meter.style.display = "flex";
+    if (chip) chip.textContent = `Server AI, ${plan} plan`;
+    if (meter) {
+        meter.classList.toggle("is-full", full);
+        meter.style.setProperty("--used", Math.min(1, limit ? used / limit : 1));
+        meter.setAttribute("aria-valuenow", String(used));
+        meter.setAttribute("aria-valuemax", String(limit));
+        meter.title = `Today ${currentUser.daily_usage ?? 0}, this month ${currentUser.monthly_usage ?? 0}`;
+        const count = document.getElementById("usageMeterCount");
+        if (count) count.textContent = full ? `${used} of ${limit} used` : `${used} of ${limit} this week`;
+    }
+    if (note) {
+        note.hidden = !full;
+        note.textContent = full
+            ? `You've used all ${limit} generations this week. Your limit resets on ${quotaResetLabel()}.`
+            : "";
+    }
 }
 
 // ============================

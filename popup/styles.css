@@ -392,7 +392,17 @@ a:hover, a:active { color: var(--color-ink); text-decoration-color: var(--color-
 .fetch-bar { animation: slideIn var(--dur-long) var(--ease-out); }
 .changelog-item { animation: slideIn var(--dur-long) var(--ease-out) calc(var(--i, 0) * 70ms) backwards; }
 
+/* Weekly usage: a short scale in the status bar, and a note by Generate once the week is used up */
+.usage-meter { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+.usage-meter[hidden], .usage-limit-note[hidden] { display: none; }
+.usage-meter__count { font: 400 var(--text-2xs)/1 var(--font-mono); font-variant-numeric: tabular-nums; color: var(--color-ink-2); white-space: nowrap; }
+.usage-meter__track { position: relative; width: 72px; height: 3px; overflow: hidden; background: var(--color-rule); }
+.usage-meter__track i { position: absolute; inset: 0; background: var(--color-accent); transform: scaleX(var(--used, 0)); transform-origin: left; transition: transform var(--dur-long) var(--ease-out); }
+.usage-meter.is-full .usage-meter__count { color: var(--color-ink); font-weight: 500; }
+.usage-limit-note { margin: 0 0 var(--space-sm); padding: var(--space-xs) var(--space-sm); border-left: 2px solid var(--color-accent); background: var(--color-paper-2); color: var(--color-ink); font-size: var(--text-xs); line-height: 1.45; }
+
 @media (prefers-reduced-motion: reduce) {
+    .usage-meter__track i { transition: none; }
     .toast, .optimized-score-section, .fetch-bar, .changelog-item, .resume-uploaded-card::after,
     .score-reveal .score-ruler__scale::before, .score-reveal .score-ruler__guide, .score-reveal .improvement-indicator { animation: none; }
 }
