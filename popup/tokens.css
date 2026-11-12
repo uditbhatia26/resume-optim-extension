@@ -1,37 +1,44 @@
-/* Sculpt popup tokens, shared with the landing page: a cool paper, one ink, one orange,
-   an editorial serif for headings, a sans for reading and a mono for technical labels. */
+/* Sculpt popup tokens, shared with the website: a blue-grey ground, white cards, deep navy
+   ink, the electric blue of the Sculpt mark for actions and progress, cyan and indigo as
+   its companions, and one geometric sans (Plus Jakarta Sans) for everything. */
 :root {
   color-scheme: light;
   --space-3xs: 2px; --space-2xs: 4px; --space-xs: 8px; --space-sm: 12px; --space-md: 16px; --space-lg: 24px; --space-xl: 40px; --space-2xl: 64px; --space-3xl: 96px; --space-4xl: 144px;
-  --text-2xs: 0.6875rem; --text-xs: 0.75rem; --text-sm: 0.875rem; --text-md: 1rem; --text-lg: 1.2rem; --text-xl: 1.5rem; --text-2xl: 1.875rem; --text-3xl: 2.25rem;
-  --text-display-s: 1.5rem; --text-display: 1.875rem; --text-section: 1.5rem; --text-title: 1rem; --text-lead: 1rem;
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1); --ease-in: cubic-bezier(0.7, 0, 0.84, 0); --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-  --dur-micro: 120ms; --dur-short: 200ms; --dur-long: 420ms;
+  --text-2xs: 0.6875rem; --text-xs: 0.75rem; --text-sm: 0.8125rem; --text-md: 0.9375rem; --text-lg: 1.0625rem; --text-xl: 1.25rem; --text-2xl: 1.625rem; --text-3xl: 2rem;
+  --text-display-s: 1.5rem; --text-display: 1.875rem; --text-section: 1.25rem; --text-title: 1rem; --text-lead: 1rem;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1); --ease-out: cubic-bezier(0.16, 1, 0.3, 1); --ease-in: cubic-bezier(0.7, 0, 0.84, 0); --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-micro: 120ms; --dur-short: 220ms; --dur-long: 450ms;
   --container: 1440px; --gutter: 64px; --gap-columns: 32px; --section-gap-s: 120px; --section-gap: 144px; --section-gap-l: 176px;
   --z-base: 1; --z-raised: 10; --z-dropdown: 100; --z-sticky: 200; --z-sticky-nav: 300; --z-modal: 400; --z-toast: 500; --z-tooltip: 600;
 
-  --color-paper: #F3F5F1;
-  --color-paper-2: #E9EDE9;
-  --color-paper-3: #DDE3DE;
-  --color-paper-hi: #FAFCF9;
-  --color-ink: #17211F;
-  --color-ink-2: #36423F;
-  --color-muted: #66716D;
-  --color-rule: #BEC7C1;
-  --color-rule-soft: #D9DFDA;
-  --color-accent: #E97832;
-  --color-accent-hover: #E36D24;
-  --color-accent-soft: rgb(233 120 50 / 0.18);
-  --color-accent-ink: #17211F;
-  --color-focus: #17211F;
-  --color-error: #B4232A; --color-success: #13703B;
+  --color-paper: #F3F6FB;
+  --color-paper-2: #E8EEF7;
+  --color-paper-3: #DCE4F0;
+  --color-paper-hi: #FFFFFF;
+  --color-ink: #0B1533;
+  --color-ink-2: #374463;
+  --color-ink-3: #172A5C;
+  --color-muted: #66728C;
+  --color-rule: #D6DEEA;
+  --color-rule-soft: #E7ECF4;
+  --color-accent: #0A6CF0;
+  --color-accent-hover: #0757C7;
+  --color-accent-soft: rgb(10 108 240 / 0.11);
+  --color-accent-2: #21C8E8;
+  --color-accent-3: #5468F0;
+  --color-accent-4: #7DB4FF;
+  --color-hl: #D6E6FF;
+  --color-accent-ink: #FFFFFF;
+  --color-focus: #0A6CF0;
+  --color-error: #C8323C; --color-error-soft: rgb(200 50 60 / 0.08);
+  --color-success: #11845B; --color-warn: #8A5A00; --color-warn-soft: #FFF4DB;
 
-  --font-display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
-  --font-body: "Geist", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-display: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
 
-  --radius-card: 2px; --radius-pill: 2px; --rule-hair: 1px;
-  --shadow-card: none;
-  --shadow-sheet: 0 1px 0 rgb(23 33 31 / 0.04), 0 18px 32px -26px rgb(23 33 31 / 0.35);
-  --tracking-display: -0.015em; --display-weight: 400;
+  --radius-card: 16px; --radius-control: 11px; --radius-pill: 999px; --rule-hair: 1px;
+  --shadow-card: 0 1px 2px rgb(11 21 51 / 0.05), 0 18px 34px -26px rgb(11 21 51 / 0.38);
+  --shadow-sheet: 0 1px 2px rgb(11 21 51 / 0.05), 0 18px 34px -26px rgb(11 21 51 / 0.38);
+  --tracking-display: -0.025em; --display-weight: 600;
 }
