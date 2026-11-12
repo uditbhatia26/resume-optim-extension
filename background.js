@@ -5,6 +5,7 @@
 
 importScripts("config.js"); // defines SCULPT_CONFIG
 const API_BASE = SCULPT_CONFIG.API_BASE;
+const DASHBOARD_ORIGIN = new URL(SCULPT_CONFIG.DASHBOARD_URL).origin;
 const MAX_JD_CHARS = 10000; // keep in sync with MAX_JD_CHARS in backend/schema/schema.py
 const clampJD = (t) => (t || "").slice(0, MAX_JD_CHARS);
 
@@ -101,6 +102,17 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                 .catch(() => sendResponse({ started: true }));
             return true; // ← changed from false
 
+        // The website's session bridge (content/bridge.js): sign-in, renewal or sign-out there
+        case "WEB_SESSION":
+            if (_sender?.id !== chrome.runtime.id || !(_sender.url || "").startsWith(DASHBOARD_ORIGIN)) return false;
+            adoptWebSession(message.token).then(sendResponse).catch(() => sendResponse({ signed_in: false }));
+            return true;
+
+        // The popup opened with no session: look for one in an open Sculpt website tab
+        case "PULL_WEB_SESSION":
+            pullWebSession().then(sendResponse).catch(() => sendResponse({ signed_in: false }));
+            return true;
+
         case "FETCH_JD":
             handleFetchJD(message.payload)
                 .then(sendResponse)
@@ -113,6 +125,74 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             return false;
     }
 });
+
+// ============================================================
+// One login: the session comes from the Sculpt website
+// ============================================================
+
+/**
+ * Take the website's token as this extension's session.
+ *   - null: the user signed out on the website, so sign out here too.
+ *   - a token we already hold, or the one the user signed out of here: nothing to do.
+ *   - anything else: check it with the API, then store the session.
+ */
+async function adoptWebSession(token) {
+    const stored = await getFromStorage(["access_token", "user_email", "ignored_web_token"]);
+
+    if (!token) {
+        if (stored.access_token) await chrome.storage.local.clear();
+        return { signed_in: false };
+    }
+    if (token === stored.access_token) return { signed_in: true };
+    if (token === stored.ignored_web_token) return { signed_in: false };
+
+    const res = await fetch(`${API_BASE}/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return { signed_in: !!stored.access_token };
+    const me = await res.json();
+
+    // A different account: drop the previous one's job, scores and saved key first
+    if (stored.user_email && stored.user_email !== me.email) await chrome.storage.local.clear();
+
+    await setToStorage({
+        access_token:        token,
+        ignored_web_token:   null,
+        user_email:          me.email,
+        user_id:             me.user_id,
+        has_resume:          !!me.has_resume,
+        resume_filename:     me.resume_filename || null,
+        plan:                me.plan ?? "free",
+        email_verified:      !!me.email_verified,
+        is_byok_allowed:     me.is_byok_allowed ?? false,
+        is_admin:            me.is_admin ?? false,
+        weekly_usage:        me.weekly_usage ?? 0,
+        weekly_limit:        me.weekly_limit ?? 5,
+        daily_usage:         me.daily_usage ?? 0,
+        monthly_usage:       me.monthly_usage ?? 0,
+        onboarding_complete: !!me.onboarding_complete,
+        setup_required:      !!me.setup_required,
+    });
+    return { signed_in: true };
+}
+
+/** Read the token from an open Sculpt website tab, if there is one, and adopt it. */
+async function pullWebSession() {
+    const tabs = await chrome.tabs.query({ url: `${DASHBOARD_ORIGIN}/*` });
+    for (const tab of tabs) {
+        try {
+            const [result] = await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                func: () => localStorage.getItem("sculpt_token"),
+            });
+            if (result?.result) {
+                const outcome = await adoptWebSession(result.result);
+                if (outcome.signed_in) return outcome;
+            }
+        } catch {
+            // Tab not scriptable (still loading, or discarded): try the next one
+        }
+    }
+    return { signed_in: false };
+}
 
 // ============================================================
 // Handlers

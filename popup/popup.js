@@ -7,7 +7,6 @@
 // API_BASE / DASHBOARD_URL come from ../config.js (loaded before this script)
 const API_BASE = SCULPT_CONFIG.API_BASE; // shorthand alias used throughout
 const DASHBOARD_URL = SCULPT_CONFIG.DASHBOARD_URL;
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 let jobDescriptionFull = "";
 let isExpanded = false;
 let currentUser = null;
@@ -349,73 +348,121 @@ const TaskProgress = {
 // Initialize
 // ============================
 document.addEventListener("DOMContentLoaded", async function () {
-    await checkAuthStatus();
+    // Wire up the buttons first: nothing the user clicks should wait on the network
     initializeEventListeners();
     listenToBackground();
+    await checkAuthStatus();
 });
 
-async function checkAuthStatus() {
-    const {
-        access_token, user_email, has_resume, resume_filename,
-        email_verified, is_byok_allowed, is_admin,
-        weekly_usage, weekly_limit, daily_usage, monthly_usage, plan,
-    } = await getFromStorage([
-        "access_token", "user_email", "has_resume", "resume_filename",
-        "email_verified", "is_byok_allowed", "is_admin",
-        "weekly_usage", "weekly_limit", "daily_usage", "monthly_usage", "plan",
-    ]);
+const SESSION_KEYS = [
+    "access_token", "user_email", "has_resume", "resume_filename",
+    "email_verified", "is_byok_allowed", "is_admin",
+    "weekly_usage", "weekly_limit", "daily_usage", "monthly_usage", "plan",
+    "onboarding_complete", "setup_required",
+];
 
-    if (!access_token) {
-        showAuthScreen();
+/**
+ * Decide what the popup shows. The session comes from the Sculpt website (the background
+ * worker stores it): no session means "sign in on the website", an unfinished setup means
+ * "finish setup on the website", otherwise the app.
+ */
+async function checkAuthStatus() {
+    let stored = await getFromStorage(SESSION_KEYS);
+
+    if (!stored.access_token) {
+        // Signed in on the website in an open tab? Pick that session up now.
+        const pulled = await sendToBackground({ type: "PULL_WEB_SESSION" }).catch(() => null);
+        if (pulled?.signed_in) stored = await getFromStorage(SESSION_KEYS);
+    }
+    if (!stored.access_token) {
+        showGate("signin");
         return;
     }
 
     currentUser = {
-        email:          user_email,
-        has_resume:     !!has_resume,
-        resume_filename,
-        email_verified: email_verified ?? true,
-        is_byok_allowed: !!is_byok_allowed,
-        is_admin:       !!is_admin,
-        plan:           plan ?? "free",
-        weekly_usage:   weekly_usage  ?? 0,
-        weekly_limit:   weekly_limit  ?? 5,
-        daily_usage:    daily_usage   ?? 0,
-        monthly_usage:  monthly_usage ?? 0,
+        email:           stored.user_email,
+        has_resume:      !!stored.has_resume,
+        resume_filename: stored.resume_filename,
+        email_verified:  stored.email_verified ?? true,
+        is_byok_allowed: !!stored.is_byok_allowed,
+        is_admin:        !!stored.is_admin,
+        plan:            stored.plan ?? "free",
+        weekly_usage:    stored.weekly_usage  ?? 0,
+        weekly_limit:    stored.weekly_limit  ?? 5,
+        daily_usage:     stored.daily_usage   ?? 0,
+        monthly_usage:   stored.monthly_usage ?? 0,
+        onboarding_complete: stored.onboarding_complete ?? true,
+        setup_required:  !!stored.setup_required,
     };
+
+    if (currentUser.setup_required) {
+        // They may have just finished on the website: ask before showing the setup screen
+        await syncSession(stored.access_token);
+        if (!currentUser || currentUser.setup_required) {
+            if (currentUser) showGate("setup");
+            return;
+        }
+    }
+
     showMainApp();
 
-    // Silently refresh the token if it expires within 24 hours
-    tryRefreshToken(access_token);
+    // Bring the session and profile up to date in the background (one request, not awaited)
+    syncSession(stored.access_token);
+}
 
-    // Re-check profile to keep entitlement and verification up to date
+/** Tokens last 24 hours; renew once fewer than this many seconds are left. */
+const REFRESH_WHEN_LEFT = 12 * 60 * 60;
+
+/**
+ * Keep the session alive and the profile current with a single request: /auth/refresh when
+ * the token is past half its life (it returns the profile too), otherwise /auth/me.
+ * Runs in the background; the popup is usable from the cached profile meanwhile.
+ */
+async function syncSession(token) {
+    const exp = getTokenExpiry(token);
+    const due = exp != null && exp - Math.floor(Date.now() / 1000) < REFRESH_WHEN_LEFT;
     try {
-        const res = await fetch(`${API_BASE}/auth/me`, {
-            headers: { "Authorization": `Bearer ${access_token}` },
-        });
-        if (res.ok) {
-            const data = await res.json();
-            currentUser.email_verified = data.email_verified;
-            currentUser.is_byok_allowed = data.is_byok_allowed ?? false;
-            currentUser.is_admin = data.is_admin ?? false;
-            currentUser.plan = data.plan;
-            currentUser.weekly_usage = data.weekly_usage;
-            currentUser.weekly_limit = data.weekly_limit;
-            await setToStorage({
-                email_verified: data.email_verified,
-                is_byok_allowed: data.is_byok_allowed ?? false,
-                is_admin: data.is_admin ?? false,
-                plan: data.plan,
-                weekly_usage: data.weekly_usage,
-                weekly_limit: data.weekly_limit,
-            });
-            const banner = document.getElementById("unverifiedBanner");
-            if (banner && data.email_verified) banner.remove();
-            renderKeyStatus();
-        }
+        const res = due
+            ? await fetch(`${API_BASE}/auth/refresh`, { method: "POST", headers: { "Authorization": `Bearer ${token}` } })
+            : await fetch(`${API_BASE}/auth/me`, { headers: { "Authorization": `Bearer ${token}` } });
+        if (!res.ok) return; // an expired session is handled on the next API call
+        applyProfile(await res.json());
     } catch {
-        // Network error — ignore
+        // Network error: the cached profile and current token keep working until expiry
     }
+}
+
+/** Apply a fresh profile from /auth/me or /auth/refresh to memory, storage and the UI. */
+function applyProfile(data) {
+    if (!currentUser) return; // signed out while the request was in flight
+    const wasGated = !!currentUser.setup_required;
+    const fields = {
+        has_resume:      data.has_resume,
+        resume_filename: data.resume_filename,
+        onboarding_complete: data.onboarding_complete,
+        setup_required:  data.setup_required,
+        plan:            data.plan,
+        email_verified:  data.email_verified,
+        is_byok_allowed: data.is_byok_allowed ?? false,
+        is_admin:        data.is_admin ?? false,
+        weekly_usage:    data.weekly_usage,
+        weekly_limit:    data.weekly_limit,
+        daily_usage:     data.daily_usage,
+        monthly_usage:   data.monthly_usage,
+    };
+    for (const [k, v] of Object.entries(fields)) if (v === undefined) delete fields[k];
+    if (data.access_token) fields.access_token = data.access_token; // a refresh issued a new token
+    Object.assign(currentUser, fields);
+    setToStorage(fields).catch(() => { });
+
+    // Setup became required (or was finished) since the popup last looked
+    if (currentUser.setup_required && !wasGated) { showGate("setup"); return; }
+    if (currentUser.setup_required) return; // still on the setup screen
+
+    if (data.email_verified) document.getElementById("unverifiedBanner")?.remove();
+    updateResumeUI(currentUser.has_resume, currentUser.resume_filename);
+    updateSetupNudge();
+    renderKeyStatus();
 }
 
 /**
@@ -431,53 +478,6 @@ function getTokenExpiry(token) {
     }
 }
 
-/**
- * If the token expires within 24 hours, silently call /auth/refresh
- * and store the new token so the user never sees a re-login screen.
- */
-async function tryRefreshToken(currentToken) {
-    const exp = getTokenExpiry(currentToken);
-    if (!exp) return;
-
-    const secondsLeft = exp - Math.floor(Date.now() / 1000);
-    const oneDayInSeconds = 60 * 60 * 24;
-    if (secondsLeft > oneDayInSeconds) return; // plenty of time left
-
-    try {
-        const res = await fetch(`${API_BASE}/auth/refresh`, {
-            method: "POST",
-            headers: { "Authorization": `Bearer ${currentToken}` },
-        });
-        if (!res.ok) return; // expired — user will be logged out on next API call
-        const data = await res.json();
-        await setToStorage({
-            access_token:  data.access_token,
-            user_email:    data.email,
-            plan:          data.plan,
-            has_resume:    data.has_resume,
-            resume_filename: data.resume_filename,
-            email_verified: data.email_verified,
-            is_byok_allowed: data.is_byok_allowed ?? false,
-            is_admin:      data.is_admin ?? false,
-            weekly_usage:  data.weekly_usage,
-            weekly_limit:  data.weekly_limit,
-            daily_usage:   data.daily_usage,
-            monthly_usage: data.monthly_usage,
-        });
-        // Update in-memory currentUser with refreshed data
-        currentUser.plan           = data.plan;
-        currentUser.is_byok_allowed = data.is_byok_allowed ?? false;
-        currentUser.is_admin        = data.is_admin ?? false;
-        currentUser.weekly_usage   = data.weekly_usage;
-        currentUser.weekly_limit   = data.weekly_limit;
-        currentUser.daily_usage    = data.daily_usage;
-        currentUser.monthly_usage  = data.monthly_usage;
-        currentUser.email_verified = data.email_verified;
-        renderKeyStatus();
-    } catch {
-        // Network error — ignore, current token still works until expiry
-    }
-}
 
 
 
@@ -527,13 +527,78 @@ function listenToBackground() {
     });
 }
 
-function showAuthScreen() {
+const GATES = {
+    signin: {
+        title: "Sign in on the website",
+        text: "Sculpt accounts live on the website. Sign in or create your account there, and this extension picks it up automatically.",
+        open: "Open Sculpt",
+        retry: "I have signed in, check again",
+    },
+    setup: {
+        title: "Finish setting up",
+        text: "Upload your resume and add your projects and achievements on the website. It takes a few minutes, and the extension unlocks as soon as you finish.",
+        open: "Continue setup",
+        retry: "I have finished, check again",
+    },
+};
+
+/** The screen shown instead of the app: sign in, or finish setup, on the website. */
+function showGate(kind) {
+    const gate = GATES[kind];
     document.getElementById("authScreen").style.display = "block";
     document.getElementById("mainApp").style.display = "none";
     document.documentElement.style.height = "480px";
     document.documentElement.style.overflow = "clip";
     document.body.style.height = "480px";
     document.body.style.overflow = "clip";
+
+    document.getElementById("gateTitle").textContent = gate.title;
+    document.getElementById("gateText").textContent = gate.text;
+    document.getElementById("gateOpenBtn").textContent = gate.open;
+    document.getElementById("gateRetryBtn").textContent = gate.retry;
+    document.getElementById("gateError").textContent = "";
+    document.getElementById("gateSignOutBtn").hidden = kind !== "setup";
+}
+
+/** "Check again" on the gate: look for the session or the finished setup, then move on. */
+async function handleGateRetry() {
+    const btn = document.getElementById("gateRetryBtn");
+    const label = btn.textContent;
+    const errorEl = document.getElementById("gateError");
+    errorEl.textContent = "";
+    btn.disabled = true;
+    btn.textContent = "Checking…";
+    try {
+        // Asking to be signed in overrides an earlier sign-out of this extension
+        await setToStorage({ ignored_web_token: null });
+        await checkAuthStatus();
+        if (document.getElementById("mainApp").style.display === "none") {
+            errorEl.textContent = currentUser
+                ? "Setup isn't finished yet. Complete the steps on the website, then check again."
+                : "No sign-in found. Sign in on the Sculpt website in this browser, then check again.";
+        }
+    } finally {
+        btn.disabled = false;
+        if (btn.textContent === "Checking…") btn.textContent = label;
+    }
+}
+
+/** A reminder for accounts that can use the extension but haven't added their extras yet. */
+function updateSetupNudge() {
+    const existing = document.getElementById("setupNudge");
+    const needed = !!currentUser && currentUser.onboarding_complete === false && !currentUser.setup_required;
+    if (!needed) { existing?.remove(); return; }
+    if (existing) return;
+
+    const banner = document.createElement("div");
+    banner.id = "setupNudge";
+    banner.className = "banner";
+    banner.setAttribute("role", "status");
+    banner.innerHTML = `
+        <span class="banner__text">${icon("info")}Add your projects and achievements for stronger resumes.</span>
+        <button type="button" id="setupNudgeBtn" class="link-btn">Open</button>`;
+    document.getElementById("mainApp")?.prepend(banner);
+    document.getElementById("setupNudgeBtn")?.addEventListener("click", handleLandingClick);
 }
 
 async function showMainApp() {
@@ -566,6 +631,7 @@ async function showMainApp() {
     if (currentUser && !currentUser.email_verified) {
         showUnverifiedBanner();
     }
+    updateSetupNudge();
 
     // Silently fetch and show history panel if optimizations exist
     loadHistory(false);
@@ -575,21 +641,10 @@ async function showMainApp() {
 }
 
 function initializeEventListeners() {
-    const loginBtn = document.getElementById("loginBtn");
-    const signupBtn = document.getElementById("signupBtn");
-    const logoutBtn = document.getElementById("logoutBtn");
-    const showSignupLink = document.getElementById("showSignup");
-    const showLoginLink = document.getElementById("showLogin");
-
-    if (loginBtn) loginBtn.addEventListener("click", handleLogin);
-    if (signupBtn) signupBtn.addEventListener("click", handleSignup);
-    if (logoutBtn) logoutBtn.addEventListener("click", handleLogout);
-    document.getElementById("forgotPasswordLink")?.addEventListener("click", handleForgotPassword);
-    if (showSignupLink) showSignupLink.addEventListener("click", () => toggleAuthForm("signup"));
-    if (showLoginLink) showLoginLink.addEventListener("click", () => toggleAuthForm("login"));
-
-    document.getElementById("googleLoginBtn")?.addEventListener("click", handleGoogleLogin);
-    document.getElementById("googleSignupBtn")?.addEventListener("click", handleGoogleLogin);
+    document.getElementById("logoutBtn")?.addEventListener("click", handleLogout);
+    document.getElementById("gateOpenBtn")?.addEventListener("click", handleLandingClick);
+    document.getElementById("gateRetryBtn")?.addEventListener("click", handleGateRetry);
+    document.getElementById("gateSignOutBtn")?.addEventListener("click", handleLogout);
 
     document.getElementById("landingBtn")?.addEventListener("click", handleLandingClick);
     document.getElementById("resumeFileInput")?.addEventListener("change", handleResumeUpload);
@@ -634,233 +689,20 @@ function initializeEventListeners() {
 }
 
 // ============================
-// Authentication Handlers
+// Session
 // ============================
-function toggleAuthForm(form) {
-    const loginForm = document.getElementById("loginForm");
-    const signupForm = document.getElementById("signupForm");
-    if (form === "signup") {
-        loginForm.style.display = "none";
-        signupForm.style.display = "block";
-    } else {
-        signupForm.style.display = "none";
-        loginForm.style.display = "block";
-    }
-}
-
-/** Store a signed-in user from any auth response (login, signup, Google) and set currentUser. */
-async function rememberSignedInUser(data) {
-    const user = {
-        email:           data.email,
-        has_resume:      !!data.has_resume,
-        resume_filename: data.resume_filename || null,
-        plan:            data.plan ?? "free",
-        email_verified:  !!data.email_verified,
-        is_byok_allowed: data.is_byok_allowed ?? false,
-        is_admin:        data.is_admin ?? false,
-        weekly_usage:    data.weekly_usage ?? 0,
-        weekly_limit:    data.weekly_limit ?? 5,
-        daily_usage:     data.daily_usage ?? 0,
-        monthly_usage:   data.monthly_usage ?? 0,
-    };
-    await setToStorage({
-        access_token: data.access_token,
-        user_email:   data.email,
-        user_id:      data.user_id,
-        ...user,
-    });
-    currentUser = user;
-}
-
-async function handleLogin(e) {
-    e.preventDefault();
-    const email = document.getElementById("loginEmail").value.trim();
-    const password = document.getElementById("loginPassword").value;
-    const errorEl = document.getElementById("loginError");
-    const btn = document.getElementById("loginBtn");
-
-    if (!email || !password) { errorEl.textContent = "Please fill in all fields"; return; }
-    if (!EMAIL_RE.test(email)) { errorEl.textContent = "Please enter a valid email address"; return; }
-
-    errorEl.textContent = "";
-    btn.disabled = true;
-    btn.textContent = "Signing in…";
-
-    try {
-        const res = await fetch(`${API_BASE}/auth/login`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw data;
-
-        await rememberSignedInUser(data);
-        showMainApp();
-    } catch (error) {
-        errorEl.textContent = apiErrorMessage(error, "Login failed. Please try again.");
-        btn.disabled = false;
-        btn.textContent = "Sign In";
-    }
-}
-
-async function handleForgotPassword(e) {
-    e.preventDefault();
-    const email = document.getElementById("loginEmail").value.trim();
-    const errorEl = document.getElementById("loginError");
-    if (!EMAIL_RE.test(email)) {
-        errorEl.textContent = "Enter your email above, then click Forgot password.";
-        return;
-    }
-    errorEl.textContent = "";
-    try {
-        const res = await fetch(`${API_BASE}/auth/forgot-password`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Could not send reset email.");
-        showToast("If that account exists, a reset link is on its way.", "info");
-    } catch (err) {
-        errorEl.textContent = err.message || "Could not send reset email.";
-    }
-}
-
-async function handleSignup(e) {
-    e.preventDefault();
-    const email = document.getElementById("signupEmail").value.trim();
-    const password = document.getElementById("signupPassword").value;
-    const fullName = document.getElementById("signupName").value.trim();
-    const errorEl = document.getElementById("signupError");
-    const btn = document.getElementById("signupBtn");
-
-    if (!email || !password) { errorEl.textContent = "Email and password are required"; return; }
-    if (!EMAIL_RE.test(email)) { errorEl.textContent = "Please enter a valid email address"; return; }
-    if (password.length < 6) { errorEl.textContent = "Password must be at least 6 characters"; return; }
-
-    errorEl.textContent = "";
-    btn.disabled = true;
-    btn.textContent = "Creating account…";
-
-    try {
-        const res = await fetch(`${API_BASE}/auth/signup`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password, full_name: fullName || null }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw data;
-
-        await rememberSignedInUser(data);
-        // Show verification-pending screen instead of main app
-        showVerificationPendingScreen(data.email);
-    } catch (error) {
-        errorEl.textContent = apiErrorMessage(error, "Signup failed. Please try again.");
-        btn.disabled = false;
-        btn.textContent = "Create Account";
-    }
-}
-
-async function handleLogout() {
-    await clearSession();
-    // Also clear the saved API key on logout
-    await chrome.storage.local.remove(["ai_provider", "ai_api_key", "ai_model"]);
-    await chrome.storage.local.clear();
-    try { await chrome.identity?.clearAllCachedAuthTokens?.(); } catch { /* not signed in with Google */ }
-    currentUser = null;
-    showAuthScreen();
-}
-
 /**
- * Google sign-in with chrome.identity.getAuthToken(). The backend checks the token was
- * issued to this extension's OAuth client before signing anyone in.
- *
- * getAuthToken only works when the extension ID matches the one registered for
- * manifest.oauth2.client_id in Google Cloud, and only in Google Chrome.
+ * Sign out of the extension. The website's token is remembered as "ignored" so an open
+ * Sculpt tab doesn't sign the extension straight back in; signing in on the website again
+ * (which issues a new token) does.
  */
-function getGoogleToken() {
-    return new Promise((resolve, reject) => {
-        chrome.identity.getAuthToken({ interactive: true }, (result) => {
-            // Chrome returns a string in older versions and { token } in newer ones
-            const token = typeof result === "string" ? result : result?.token;
-            if (chrome.runtime.lastError || !token) {
-                reject(new Error(chrome.runtime.lastError?.message || "Google sign-in was cancelled."));
-            } else {
-                resolve(token);
-            }
-        });
-    });
-}
-
-function forgetGoogleToken(token) {
-    return new Promise((resolve) => {
-        try { chrome.identity.removeCachedAuthToken({ token }, () => resolve()); }
-        catch { resolve(); }
-    });
-}
-
-function postGoogleToken(token) {
-    return fetch(`${API_BASE}/auth/google`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ access_token: token }),
-    });
-}
-
-/** Turn Chrome identity and backend errors into something a person can act on. */
-function googleErrorMessage(err) {
-    const msg = String(err?.detail || err?.message || err || "");
-    const lower = msg.toLowerCase();
-    if (lower.includes("not supported")) {
-        return "Google sign-in needs Google Chrome. Sign in with email and password instead.";
-    }
-    if (lower.includes("client id") || lower.includes("bad client") || lower.includes("oauth2 client")) {
-        return "Google sign-in isn't set up for this copy of the extension (its ID doesn't match the Google OAuth client).";
-    }
-    if (lower.includes("did not approve") || lower.includes("cancel") || lower.includes("not granted")) {
-        return "Google sign-in was cancelled.";
-    }
-    return msg ? `Google sign-in failed: ${msg}` : "Google sign-in failed. Please try again.";
-}
-
-async function handleGoogleLogin(e) {
-    const clientId = chrome.runtime.getManifest().oauth2?.client_id;
-    if (!clientId || clientId.startsWith("YOUR_")) {
-        showAuthError("Google sign-in is not configured yet.");
-        return;
-    }
-    if (!chrome.identity?.getAuthToken) {
-        showAuthError(googleErrorMessage("not supported"));
-        return;
-    }
-
-    const btn = e?.currentTarget || document.getElementById("googleLoginBtn");
-    const originalHTML = btn ? btn.innerHTML : "";
-    if (btn) { btn.disabled = true; btn.textContent = "Connecting…"; }
-
-    try {
-        let token = await getGoogleToken();
-        let res = await postGoogleToken(token);
-        if (res.status === 401) {
-            // Chrome can hand back a cached token Google has since revoked: drop it and try once more
-            await forgetGoogleToken(token);
-            token = await getGoogleToken();
-            res = await postGoogleToken(token);
-        }
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw data;
-
-        await rememberSignedInUser(data);
-        showMainApp();
-    } catch (err) {
-        showAuthError(googleErrorMessage(err));
-    } finally {
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = originalHTML;
-        }
-    }
+async function handleLogout() {
+    const { access_token } = await getFromStorage(["access_token"]);
+    await clearSession();
+    await chrome.storage.local.clear();
+    if (access_token) await setToStorage({ ignored_web_token: access_token });
+    currentUser = null;
+    showGate("signin");
 }
 
 
@@ -1192,9 +1034,9 @@ async function handleAddJobClick() {
     const textarea = document.getElementById("jobDescriptionInput");
     const inputText = textarea.value.trim();
 
-    if (!inputText) { showAuthError("Please paste a job description first."); return; }
+    if (!inputText) { showError("Please paste a job description first."); return; }
     if (inputText.length < 50) {
-        showAuthError("Job description is too short. Please paste the full job posting.");
+        showError("Job description is too short. Please paste the full job posting.");
         return;
     }
 
@@ -1924,13 +1766,13 @@ function setGenerateButtonRunning(running) {
 }
 
 function showError(msg) {
-    // Try main app error slot first, then auth form error, then toast
+    // The main app's error slot when the app is showing, otherwise a toast
     const mainEl = document.getElementById("uploadError2") || document.getElementById("uploadError");
     if (mainEl && document.getElementById("mainApp")?.style.display !== "none") {
         mainEl.textContent = msg;
         mainEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
     } else {
-        showAuthError(msg);
+        showToast(msg, "error");
     }
 }
 
@@ -1946,24 +1788,6 @@ function showToast(msg, type = "success") {
     toast.textContent = msg;
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 3500);
-}
-
-/** Show an error on the auth screen (uses whichever error div is visible). */
-function showAuthError(msg) {
-    // Pick the visible form's error div
-    const loginForm  = document.getElementById("loginForm");
-    const signupForm = document.getElementById("signupForm");
-    const isSignup   = signupForm && signupForm.style.display !== "none";
-    const errEl      = isSignup
-        ? document.getElementById("signupError")
-        : document.getElementById("loginError");
-
-    if (errEl) {
-        errEl.textContent = msg;
-        errEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    } else {
-        showToast(msg, "error");
-    }
 }
 
 /* Counts a score from one value to another, for a short, restrained reading. Reduced motion lands on the value. */
@@ -2412,35 +2236,6 @@ function renderExplanation(data) {
 // ============================
 
 /**
- * Replace the auth screen with a "Check your inbox" panel.
- * Shown immediately after signup.
- */
-function showVerificationPendingScreen(email) {
-    const authScreen = document.getElementById("authScreen");
-    if (!authScreen) return;
-
-    authScreen.style.display = "block";
-    document.getElementById("mainApp").style.display = "none";
-
-    authScreen.innerHTML = `
-      <div class="verify-screen">
-        ${icon("mail")}
-        <h2>Check your inbox</h2>
-        <p>We sent a verification link to <strong>${escapeHtml(email)}</strong>. Open it to activate your account, then come back and sign in.</p>
-        <button type="button" id="resendVerifyBtn" class="btn btn-primary">Resend email</button>
-        <button type="button" id="backToLoginBtn" class="link-btn">Back to sign in</button>
-      </div>`;
-
-    document.getElementById("resendVerifyBtn")?.addEventListener("click", handleResendVerification);
-    document.getElementById("backToLoginBtn")?.addEventListener("click", () => {
-        // Clear the pending state and show the normal auth screen
-        chrome.storage.local.clear();
-        currentUser = null;
-        location.reload();
-    });
-}
-
-/**
  * Show a dismissible banner at the top of the main app for logged-in
  * but unverified users.
  */
@@ -2464,8 +2259,7 @@ function showUnverifiedBanner() {
 
 /** Call /auth/resend-verification and show feedback. */
 async function handleResendVerification() {
-    const btn = document.getElementById("resendVerifyBtn") ||
-        document.getElementById("resendVerifyBannerBtn");
+    const btn = document.getElementById("resendVerifyBannerBtn");
     if (btn) { btn.disabled = true; btn.textContent = "Sending…"; }
 
     try {
@@ -2483,7 +2277,7 @@ async function handleResendVerification() {
     } catch {
         showToast("Network error. Please try again.", "error");
     } finally {
-        if (btn) { btn.disabled = false; btn.textContent = btn.id === "resendVerifyBtn" ? "Resend email" : "Resend"; }
+        if (btn) { btn.disabled = false; btn.textContent = "Resend"; }
     }
 }
 

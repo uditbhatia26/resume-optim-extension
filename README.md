@@ -6,14 +6,15 @@ Sculpt is a Chrome extension that analyzes your resume against a job description
 
 ## Features
 
-### Authentication
-- Email and password signup and login
-- Google OAuth via the Chrome Identity API
-- Email verification on signup with resend support
-- JWT-based session management with silent token refresh; sessions last 7 days
+### Sign-in
+- Accounts live on the Sculpt website: people sign up, sign in (email or Google) and set up their profile there
+- The extension has no login form. A small bridge script (`content/bridge.js`), which runs only on the Sculpt website, passes the website's session to the extension, so there is one login for both; signing out on the website signs the extension out
+- Until website setup is finished, the popup shows "Finish setting up" with a button to continue there (accounts that predate onboarding are not locked out; they see a reminder)
+- Sessions renew silently when the token is past half its 24-hour life
 
 ### Resume Management
-- Upload a resume as a PDF (max 2 MB)
+- The resume uploaded on the website is already there when the extension opens
+- Upload a different resume as a PDF or DOCX (max 2 MB)
 - The backend parses it into a structured format automatically
 - One active resume per account; replaceable at any time via the Change button
 
@@ -55,9 +56,10 @@ Sculpt is a Chrome extension that analyzes your resume against a job description
 ## Application Flow
 
 ```
-1. Sign up or log in
+1. Sign up and set up your profile on the Sculpt website
+         |-- resume, projects (Chisel), achievements
          |
-2. Upload resume (PDF)
+2. Open the extension: already signed in, resume loaded
          |
 3. Open a job listing page
          |-- Sculpt auto-detects the job description --> Click "Use from Page"
@@ -88,8 +90,8 @@ Auto-detection is supported on: LinkedIn, Indeed, Glassdoor, Naukri, Greenhouse,
 |---|---|
 | `storage` | Persist session, job description, and optimization state across popup opens |
 | `activeTab` + `scripting` | Extract job descriptions from the current browser tab |
-| `identity` | Google OAuth authentication |
-| `tabs` | Open the web dashboard in a new tab |
+| `tabs` | Open the Sculpt website in a new tab; find an open Sculpt tab to pick up its session |
+| Host access to the Sculpt website | Run the session bridge there (one login for website and extension) |
 
 ---
 
