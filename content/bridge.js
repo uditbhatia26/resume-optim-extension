@@ -19,6 +19,18 @@
     const existing = localStorage.getItem(TOKEN_KEY);
     if (existing) send(existing);
 
+    // The extension can also ask (when its injected read of the page fails)
+    try {
+        chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+            if (msg?.type === "GET_WEB_SESSION" && sender.id === chrome.runtime.id) {
+                sendResponse({ token: localStorage.getItem(TOKEN_KEY) });
+            }
+            return false;
+        });
+    } catch {
+        // Extension reloaded while this tab stayed open
+    }
+
     // The website announces sign-in, token renewal and sign-out as they happen
     window.addEventListener("message", (event) => {
         if (event.source !== window || event.origin !== window.location.origin) return;

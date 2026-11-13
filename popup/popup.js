@@ -372,6 +372,7 @@ async function checkAuthStatus() {
     if (!stored.access_token) {
         // Signed in on the website in an open tab? Pick that session up now.
         const pulled = await sendToBackground({ type: "PULL_WEB_SESSION" }).catch(() => null);
+        lastPull = pulled;
         if (pulled?.signed_in) stored = await getFromStorage(SESSION_KEYS);
     }
     if (!stored.access_token) {
@@ -560,8 +561,38 @@ function showGate(kind) {
     document.getElementById("gateSignOutBtn").hidden = kind !== "setup";
 }
 
+/** Ask Chrome for access to the Sculpt website (a no-op when already granted). */
+function requestSiteAccess() {
+    const origin = new URL(SCULPT_CONFIG.DASHBOARD_URL).origin;
+    return chrome.permissions?.request({ origins: [`${origin}/*`] }).catch(() => false) ?? Promise.resolve(false);
+}
+
+/** Why the last look for a website session found none (see pullWebSession in background.js). */
+let lastPull = null;
+
+function noSessionMessage(pull) {
+    const site = (pull?.origin || SCULPT_CONFIG.DASHBOARD_URL).replace(/^https?:\/\//, "");
+    switch (pull?.reason) {
+        case "no_tab":
+            return `No Sculpt tab is open. Open ${site} in this browser (choose Open Sculpt), sign in there, then check again.`;
+        case "rejected":
+            return "Your sign-in on the website has expired. Reload the Sculpt tab, sign in again, then check again.";
+        case "offline":
+            return "Couldn't reach the Sculpt server. Make sure it's running, then check again.";
+        case "no_access":
+            return `Sculpt isn't allowed to read ${site}. Choose Allow when Chrome asks, or open chrome://extensions, then Sculpt, Details, Site access, and allow ${site}.`;
+        case "unreadable":
+            return "Sculpt couldn't read the open Sculpt tab. Reload that tab, then check again.";
+        default:
+            return `The Sculpt tab at ${site} is signed out. Sign in there, then check again.`;
+    }
+}
+
 /** "Check again" on the gate: look for the session or the finished setup, then move on. */
 async function handleGateRetry() {
+    // First, while the click still counts as a user gesture: make sure the extension may read
+    // the Sculpt website. If site access was withheld, Chrome asks; if granted, nothing shows.
+    await requestSiteAccess();
     const btn = document.getElementById("gateRetryBtn");
     const label = btn.textContent;
     const errorEl = document.getElementById("gateError");
@@ -575,7 +606,7 @@ async function handleGateRetry() {
         if (document.getElementById("mainApp").style.display === "none") {
             errorEl.textContent = currentUser
                 ? "Setup isn't finished yet. Complete the steps on the website, then check again."
-                : "No sign-in found. Sign in on the Sculpt website in this browser, then check again.";
+                : noSessionMessage(lastPull);
         }
     } finally {
         btn.disabled = false;

@@ -144,10 +144,15 @@ async function adoptWebSession(token) {
         return { signed_in: false };
     }
     if (token === stored.access_token) return { signed_in: true };
-    if (token === stored.ignored_web_token) return { signed_in: false };
+    if (token === stored.ignored_web_token) return { signed_in: false, reason: "ignored" };
 
-    const res = await fetch(`${API_BASE}/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
-    if (!res.ok) return { signed_in: !!stored.access_token };
+    let res;
+    try {
+        res = await fetch(`${API_BASE}/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
+    } catch {
+        return { signed_in: !!stored.access_token, reason: "offline" };
+    }
+    if (!res.ok) return { signed_in: !!stored.access_token, reason: res.status === 401 ? "rejected" : "offline" };
     const me = await res.json();
 
     // A different account: drop the previous one's job, scores and saved key first
@@ -174,24 +179,53 @@ async function adoptWebSession(token) {
     return { signed_in: true };
 }
 
-/** Read the token from an open Sculpt website tab, if there is one, and adopt it. */
+/**
+ * Read the token from an open Sculpt website tab, if there is one, and adopt it.
+ * When nothing is adopted, `reason` says why, so the popup can tell the person what to do:
+ *   no_tab     no tab open at the Sculpt website's address (DASHBOARD_ORIGIN)
+ *   signed_out a Sculpt tab is open but signed out
+ *   rejected   the tab's sign-in has expired or was revoked
+ *   offline    the Sculpt server couldn't be reached
+ */
 async function pullWebSession() {
     const tabs = await chrome.tabs.query({ url: `${DASHBOARD_ORIGIN}/*` });
+    if (tabs.length === 0) return { signed_in: false, reason: "no_tab", origin: DASHBOARD_ORIGIN };
+    // Site access can be withheld in chrome://extensions ("On click"); then no tab can be read
+    const access = await chrome.permissions.contains({ origins: [`${DASHBOARD_ORIGIN}/*`] }).catch(() => true);
+    if (!access) return { signed_in: false, reason: "no_access", origin: DASHBOARD_ORIGIN };
+
+    let reason = null;
+    let readAny = false;
     for (const tab of tabs) {
-        try {
-            const [result] = await chrome.scripting.executeScript({
-                target: { tabId: tab.id },
-                func: () => localStorage.getItem("sculpt_token"),
-            });
-            if (result?.result) {
-                const outcome = await adoptWebSession(result.result);
-                if (outcome.signed_in) return outcome;
-            }
-        } catch {
-            // Tab not scriptable (still loading, or discarded): try the next one
-        }
+        const token = await readTabToken(tab.id);
+        if (token === undefined) continue;          // this tab couldn't be read
+        readAny = true;
+        if (!token) continue;                       // read fine: signed out in that tab
+        const outcome = await adoptWebSession(token);
+        if (outcome.signed_in) return outcome;
+        if (outcome.reason) reason = outcome.reason;
     }
-    return { signed_in: false };
+    return { signed_in: false, reason: reason || (readAny ? "signed_out" : "unreadable"), origin: DASHBOARD_ORIGIN };
+}
+
+/** The Sculpt token stored in a tab: a string, null when signed out, undefined if unreadable. */
+async function readTabToken(tabId) {
+    try {
+        const [result] = await chrome.scripting.executeScript({
+            target: { tabId },
+            func: () => localStorage.getItem("sculpt_token"),
+        });
+        return result?.result ?? null;
+    } catch (err) {
+        console.warn("Sculpt: couldn't read the website tab directly:", err?.message || err);
+    }
+    // Second way: ask the bridge script running on the page
+    try {
+        const reply = await chrome.tabs.sendMessage(tabId, { type: "GET_WEB_SESSION" });
+        return reply ? (reply.token ?? null) : undefined;
+    } catch {
+        return undefined;
+    }
 }
 
 // ============================================================
