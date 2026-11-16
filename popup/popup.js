@@ -684,8 +684,8 @@ function initializeEventListeners() {
     document.getElementById("removeJobBtn")?.addEventListener("click", handleRemoveJobClick);
     document.getElementById("readMoreBtn")?.addEventListener("click", handleReadMoreClick);
     document.getElementById("analyzeBtn")?.addEventListener("click", handleAnalyzeClick);
+    document.getElementById("upgradeBtn")?.addEventListener("click", openUpgradePage);
     document.getElementById("generateBtn")?.addEventListener("click", handleGenerateClick);
-    document.getElementById("previewBtn")?.addEventListener("click", handlePreviewClick);
     document.getElementById("downloadBtn")?.addEventListener("click", handleDownloadClick);
     document.getElementById("downloadTexBtn")?.addEventListener("click", handleDownloadTexClick);
     document.getElementById("homeBtn")?.addEventListener("click", handleResetToHome);
@@ -1083,6 +1083,8 @@ async function handleAddJobClick() {
         session_optimized_score: null,
         session_improvements: null,
         session_optimized_yaml: null,
+        session_optimization_id: null,
+        session_explanation: null,
         optimization_status: null,
         optimization_error: null,
         session_progress: 1,
@@ -1179,9 +1181,6 @@ async function handleResetToHome() {
         generateBtn.disabled = true;
         setGenerateButtonRunning(false);
     }
-
-    const previewBtn = document.getElementById("previewBtn");
-    if (previewBtn) previewBtn.disabled = true;
 
     const downloadBtn = document.getElementById("downloadBtn");
     if (downloadBtn) {
@@ -1435,6 +1434,8 @@ function handleAnalyzeError(errMsg) {
     }
     if (errMsg === "SESSION_EXPIRED") { handleLogout(); return; }
     showError("Error analyzing: " + errMsg);
+    // Out of analyses on the free plan: offer Pro right there
+    if (/analysis limit/i.test(errMsg) && (currentUser?.plan || "free").toLowerCase() === "free") showUpgrade(true);
 }
 
 /**
@@ -1529,7 +1530,6 @@ function handleOptimizeDone(data) {
     }).catch(() => { });
 
     updateProgress(3);
-    document.getElementById("previewBtn").style.display = "none";
     document.getElementById("downloadBtn").style.display = "inline-flex";
     document.getElementById("downloadBtn").disabled = false;
     const dlTex = document.getElementById("downloadTexBtn");
@@ -1565,10 +1565,6 @@ function handleOptimizeError(errMsg) {
         return;
     }
     showError("Optimization failed: " + errMsg);
-}
-
-async function handlePreviewClick() {
-    showToast("Preview is coming soon.", "info");
 }
 
 async function handleDownloadClick() {
@@ -1753,6 +1749,7 @@ function renderUsage() {
     if (meter) meter.hidden = !serverAi;
     if (!serverAi) {
         if (note) note.hidden = true;
+        showUpgrade(false);
         return;
     }
 
@@ -1777,6 +1774,17 @@ function renderUsage() {
             ? `You've used all ${limit} generations this week. Your limit resets on ${quotaResetLabel()}.`
             : "";
     }
+    showUpgrade(full && plan === "free");
+}
+
+/** The Go Pro button under the limit note: opens the Plan page on the Sculpt website. */
+function showUpgrade(show) {
+    const btn = document.getElementById("upgradeBtn");
+    if (btn) btn.hidden = !show;
+}
+
+function openUpgradePage() {
+    chrome.tabs.create({ url: new URL("/#plan", DASHBOARD_URL).href });
 }
 
 // ============================
@@ -2123,8 +2131,8 @@ async function handleExplainChangesClick() {
         return;
     }
 
-    const { session_explanation, session_optimized_yaml, access_token } =
-        await getFromStorage(["session_explanation", "session_optimized_yaml", "access_token"]);
+    const { session_explanation, session_optimized_yaml, session_optimization_id, access_token } =
+        await getFromStorage(["session_explanation", "session_optimized_yaml", "session_optimization_id", "access_token"]);
 
     if (session_explanation) {
         _cachedExplanation = session_explanation;
@@ -2158,6 +2166,7 @@ async function handleExplainChangesClick() {
             body: JSON.stringify({
                 optimized_yaml: session_optimized_yaml,
                 job_description: jobDescriptionFull || "",
+                optimization_id: session_optimization_id || null,
                 ai_config: aiConfig,
             }),
         });
