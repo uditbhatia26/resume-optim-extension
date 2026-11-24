@@ -21,7 +21,7 @@
         },
         {
             "matches": [
-                "http://localhost:5173/*"
+                "https://resumesculpt.app/*"
             ],
             "js": [
                 "content/bridge.js"
@@ -30,8 +30,8 @@
         }
     ],
     "host_permissions": [
-        "http://localhost:8000/*",
-        "http://localhost:5173/*"
+        "https://api.resumesculpt.app/*",
+        "https://resumesculpt.app/*"
     ],
     "background": {
         "service_worker": "background.js"

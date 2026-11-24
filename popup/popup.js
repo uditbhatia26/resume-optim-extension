@@ -120,7 +120,7 @@ async function restoreSession() {
         const btn = document.getElementById("analyzeBtn");
         btn.disabled = true;
         showLoadingState(btn, "Analyzing…");
-        TaskProgress.start("Analyzing resume compatibility", 15_000);
+        TaskProgress.start("Analyzing resume compatibility", 15_000, "analyzeBtn");
         startAnalyzePoller();
     } else if (s.analyze_status === "error") {
         showError("Analysis failed: " + (s.analyze_error || "Unknown error"));
@@ -149,7 +149,7 @@ async function restoreSession() {
         });
     } else if (s.optimization_status === "running") {
         setGenerateButtonRunning(true);
-        TaskProgress.start("Generating optimized resume", 40_000);
+        TaskProgress.start("Generating optimized resume", 40_000, "generateBtn");
         startResultPoller();
     } else if (s.optimization_status === "error") {
         showError(`Optimization failed: ${s.optimization_error || "Unknown error"}`);
@@ -275,11 +275,12 @@ const TaskProgress = {
     _pct: 0,
 
     /**
-     * Start the progress bar.
+     * Start the progress bar, shown right below the button that started the task.
      * @param {string} label      - e.g. "Analyzing resume…"
      * @param {number} durationMs - expected total duration (ms). Bar reaches ~90% at this point.
+     * @param {string} anchorId   - id of the button the bar appears under ("analyzeBtn", "generateBtn")
      */
-    start(label, durationMs) {
+    start(label, durationMs, anchorId) {
         this.stop();
         this._start = Date.now();
         this._duration = durationMs;
@@ -292,6 +293,9 @@ const TaskProgress = {
         const eta = document.getElementById("taskProgressEta");
 
         if (!wrap) return;
+        // One bar, moved to sit just below the button being waited on
+        const anchor = anchorId && document.getElementById(anchorId);
+        if (anchor && anchor.nextElementSibling !== wrap) anchor.insertAdjacentElement("afterend", wrap);
         wrap.style.display = "block";
         lbl.textContent = label;
         bar.style.transform = "scaleX(0)";
@@ -1279,7 +1283,7 @@ async function handleAnalyzeClick() {
 
     btn.disabled = true;
     showLoadingState(btn, "Analyzing…");
-    TaskProgress.start("Analyzing resume compatibility", 15_000);
+    TaskProgress.start("Analyzing resume compatibility", 15_000, "analyzeBtn");
 
     const { session_jd_cache_id } = await getFromStorage(["session_jd_cache_id"]);
 
@@ -1471,7 +1475,7 @@ async function handleGenerateClick() {
 
     setGenerateButtonRunning(true);
     await saveSession({ optimization_status: "running" });
-    TaskProgress.start("Generating optimized resume", 40_000);
+    TaskProgress.start("Generating optimized resume", 40_000, "generateBtn");
 
     const templateSelect = document.getElementById("templateSelect");
     const selectedTemplate = templateSelect ? templateSelect.value : "jakes_resume";
@@ -2407,10 +2411,11 @@ function renderHistoryList(history) {
         }
 
         // Score improvement badge
-        const diff = item.score_improvement || (item.optimized_ats_score - item.original_ats_score) || 0;
-        const diffNum = Number(diff) || 0;
+        // At most 2 decimals: 87.6 -> 89.2 is stored as 1.6000000000000085
+        const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+        const diffNum = round2(item.score_improvement || (item.optimized_ats_score - item.original_ats_score));
         const diffText = diffNum > 0 ? `+${diffNum}` : `${diffNum}`;
-        const diffClass = diff > 0 ? "history-score-up" : "history-score-neutral";
+        const diffClass = diffNum > 0 ? "history-score-up" : "history-score-neutral";
 
         div.innerHTML = `
             <div class="history-item-details">
@@ -2420,8 +2425,8 @@ function renderHistoryList(history) {
                 <div class="history-item-meta">
                     <span class="history-item-date">${escapeHtml(dateStr)}</span>
                     <span class="history-item-scores">
-                        <s>${Number(item.original_ats_score) || 0}%</s>
-                        <strong>${Number(item.optimized_ats_score) || 0}%</strong>
+                        <s>${round2(item.original_ats_score)}%</s>
+                        <strong>${round2(item.optimized_ats_score)}%</strong>
                         <span class="history-score-badge ${diffClass}">${diffText} pts</span>
                     </span>
                 </div>

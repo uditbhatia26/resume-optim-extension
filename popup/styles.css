@@ -314,6 +314,8 @@ a:hover, a:active { color: var(--color-accent); text-decoration-color: currentCo
     animation: stripes 700ms linear infinite;
 }
 .task-progress__eta { margin-top: 6px; min-height: 1lh; font: 500 var(--text-2xs)/1.4 var(--font-body); color: var(--color-muted); }
+/* Under the Analyze / Generate button it belongs to: part of that card, not a card of its own */
+.action-section .task-progress { margin: 10px 0 0; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
 
 /* ── The result: original and new score on one 0–100 scale ──────────── */
 .optimized-score-section { padding: 14px; animation: slideIn var(--dur-long) var(--ease-out); }
