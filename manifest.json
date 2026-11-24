@@ -3,11 +3,11 @@
     "name": "ResumeSculpt - AI Resume Optimizer",
     "version": "1.0.0",
     "description": "Optimize your resume for any job with AI-powered matching and tailoring",
+    "homepage_url": "https://resumesculpt.app",
     "permissions": [
         "storage",
         "activeTab",
-        "scripting",
-        "tabs"
+        "scripting"
     ],
     "content_scripts": [
         {
